@@ -29,6 +29,7 @@ type VoiceContextValue = {
   backgroundListenOk: boolean | null;
   setListening: (on: boolean) => Promise<void>;
   pushToTalk: () => Promise<void>;
+  refreshMic: () => Promise<boolean>;
 };
 
 const VoiceContext = createContext<VoiceContextValue | null>(null);
@@ -71,6 +72,12 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     const asked = await requestRecordingPermissionsAsync();
     setMicGranted(asked.granted);
     return asked.granted;
+  }, []);
+
+  const refreshMic = useCallback(async (): Promise<boolean> => {
+    const current = await getRecordingPermissionsAsync();
+    setMicGranted(current.granted);
+    return current.granted;
   }, []);
 
   const startStream = useCallback(async () => {
@@ -161,6 +168,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         backgroundListenOk,
         setListening,
         pushToTalk,
+        refreshMic,
       }}
     >
       {children}

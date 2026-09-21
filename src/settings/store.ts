@@ -28,6 +28,8 @@ export type Settings = {
   sendCrawlerEnabled: boolean;
   /** Japandi UI. Dark is the product default, independent of the OS scheme. */
   appearance: Appearance;
+  /** First-launch pager has been finished or skipped to Home. */
+  onboardingComplete: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -45,6 +47,7 @@ export const DEFAULT_SETTINGS: Settings = {
   calendarId: null,
   sendCrawlerEnabled: false,
   appearance: 'dark',
+  onboardingComplete: false,
 };
 
 const STORAGE_KEY = 'assistant.settings.v1';

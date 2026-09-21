@@ -17,16 +17,14 @@ Notifications.setNotificationHandler({
   }),
 });
 
-let prepared = false;
+let channelReady = false;
 
 /**
- * Creates the Android channel and asks for permission.
- *
- * Order matters on Android 13+: the OS only shows the notification permission
- * prompt for apps that have at least one channel, so create the channel first.
+ * Creates the Android reminder channel with no permission prompt.
+ * Android 13+ only shows the notification permission UI after a channel exists.
  */
-export async function prepareNotifications(): Promise<boolean> {
-  if (prepared) return true;
+export async function ensureReminderChannel(): Promise<void> {
+  if (channelReady) return;
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync(REMINDER_CHANNEL, {
@@ -39,12 +37,18 @@ export async function prepareNotifications(): Promise<boolean> {
     });
   }
 
-  const current = await Notifications.getPermissionsAsync();
-  const granted =
-    current.granted || (await Notifications.requestPermissionsAsync()).granted;
+  channelReady = true;
+}
 
-  prepared = granted;
-  return granted;
+/**
+ * Ensures the channel exists, then asks for notification permission.
+ * Call this when always-listen or a reminder actually needs it — not on cold start.
+ */
+export async function prepareNotifications(): Promise<boolean> {
+  await ensureReminderChannel();
+
+  const current = await Notifications.getPermissionsAsync();
+  return current.granted || (await Notifications.requestPermissionsAsync()).granted;
 }
 
 /** Schedules a one-shot local notification and returns its OS identifier. */

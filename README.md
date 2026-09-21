@@ -20,9 +20,7 @@ npx expo prebuild --platform android
 npx expo run:android
 ```
 
-The first time, open **Settings** and download Whisper tiny.en plus Qwen2.5 1.5B — or import GGUF files you already have. Typed commands on the home screen work even before a model is downloaded.
-
-Always-on listening shows a persistent notification (Android 14 will mute the mic without it). Optional auto-tap Send lives in Android Accessibility settings.
+The first open walks through privacy, microphone, wake word, and optional model download. You can skip the download: typed commands still work. Always-on listening shows a persistent notification (Android 14 will mute the mic without it). Optional auto-tap Send lives in Android Accessibility settings.
 
 ## Download
 

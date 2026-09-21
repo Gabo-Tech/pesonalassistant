@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { getDb } from './db';
 import { loadLlm, subscribeEngine, type EngineStatus } from './llm/engine';
 import { MODELS, localPath, type ModelSpec } from './models/catalog';
-import { prepareNotifications } from './notify';
+import { ensureReminderChannel } from './notify';
 import { loadSettings, peekSettings, subscribeSettings } from './settings/store';
 import { isSttReady, loadStt, subscribeStt } from './voice/stt';
 
@@ -40,8 +40,8 @@ function modelsMissing(): boolean {
 }
 
 /**
- * Runs once at app start (root layout): open the database, ask for notification
- * permission, and load whichever models the user has already downloaded.
+ * Runs once at app start (root layout): open the database, create the reminder
+ * channel, and load whichever models the user has already downloaded.
  */
 export function BootProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<BootState>({
@@ -66,7 +66,7 @@ export function BootProvider({ children }: { children: ReactNode }) {
       try {
         await loadSettings();
         await getDb();
-        await prepareNotifications();
+        await ensureReminderChannel();
 
         const llm = resolveModel('llm');
         const stt = resolveModel('stt');
