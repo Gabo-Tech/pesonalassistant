@@ -3,12 +3,21 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@/*": ["./src/*"],
-      // whisper.rn ships an "exports" map with only subpath patterns and no "."
-      // entry, so a bare `import from 'whisper.rn'` has no types to resolve to.
-      "whisper.rn": ["./node_modules/whisper.rn/lib/typescript/index.d.ts"]
+      "@/*": [
+        "./src/*"
+      ],
+      "whisper.rn": [
+        "./node_modules/whisper.rn/lib/typescript/index.d.ts"
+      ]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
-  "exclude": ["node_modules", "android", "ios"]
+  "include": [
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "android",
+    "ios"
+  ]
 }

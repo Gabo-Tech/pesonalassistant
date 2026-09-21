@@ -7,7 +7,6 @@
     "icon": "./assets/icon.png",
     "scheme": "assistant",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.local.assistant"
@@ -64,7 +63,8 @@
           "color": "#7C5CFF"
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      "expo-asset"
     ],
     "extra": {
       "router": {}

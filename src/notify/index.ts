@@ -34,7 +34,8 @@ export async function prepareNotifications(): Promise<boolean> {
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#7C5CFF',
-      sound: 'default',
+      // Leave `sound` unset: expo-notifications treats a string here as the name of a
+      // bundled custom sound file, so 'default' would look for default.wav and warn.
     });
   }
 
@@ -60,7 +61,6 @@ export async function scheduleReminderNotification(
     content: {
       title: 'Reminder',
       body: text,
-      sound: 'default',
       ...(Platform.OS === 'android' ? { channelId: REMINDER_CHANNEL } : null),
     },
     trigger: {
