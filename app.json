@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "assistant",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.local.assistant"
@@ -14,7 +14,7 @@
     "android": {
       "package": "com.local.assistant",
       "adaptiveIcon": {
-        "backgroundColor": "#0B1020",
+        "backgroundColor": "#0C0C0C",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -60,7 +60,7 @@
       [
         "expo-notifications",
         {
-          "color": "#7C5CFF"
+          "color": "#171717"
         }
       ],
       "expo-audio",

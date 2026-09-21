@@ -1,0 +1,9 @@
+{
+  "platforms": ["android"],
+  "android": {
+    "modules": [
+      "expo.modules.sendcrawler.SendCrawlerModule",
+      "expo.modules.sendcrawler.ListenForegroundModule"
+    ]
+  }
+}

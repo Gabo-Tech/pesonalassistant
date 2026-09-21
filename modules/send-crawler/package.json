@@ -1,0 +1,12 @@
+{
+  "name": "send-crawler",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "description": "On-device Accessibility send-tap plus microphone foreground service.",
+  "keywords": ["expo", "react-native"],
+  "peerDependencies": {
+    "expo": "*",
+    "react": "*",
+    "react-native": "*"
+  }
+}

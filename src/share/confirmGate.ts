@@ -34,6 +34,9 @@ type Listener = (state: GateState) => void;
 const listeners = new Set<Listener>();
 let state: GateState = { pending: null, lastOutcome: null };
 let expiryTimer: ReturnType<typeof setTimeout> | null = null;
+/** Remaining ms when expiry is paused (STT in flight). */
+let remainingMs = 0;
+let paused = false;
 
 function publish(next: Partial<GateState>): void {
   state = { ...state, ...next };
@@ -57,6 +60,18 @@ function clearTimer(): void {
   }
 }
 
+function armTimer(pending: Pending, delayMs: number): void {
+  clearTimer();
+  paused = false;
+  remainingMs = delayMs;
+  pending.expiresAt = Date.now() + delayMs;
+  expiryTimer = setTimeout(() => {
+    if (state.pending?.id === pending.id) {
+      publish({ pending: null, lastOutcome: 'Timed out - nothing was sent.' });
+    }
+  }, delayMs);
+}
+
 /**
  * Queues an action for approval, replacing any previous one so there is never
  * ambiguity about what "yes" refers to.
@@ -66,6 +81,7 @@ export function requestConfirm(
   timeoutMs = 20_000,
 ): Pending {
   clearTimer();
+  paused = false;
 
   const createdAt = Date.now();
   const pending: Pending = {
@@ -76,14 +92,28 @@ export function requestConfirm(
   };
 
   publish({ pending, lastOutcome: null });
-
-  expiryTimer = setTimeout(() => {
-    if (state.pending?.id === pending.id) {
-      publish({ pending: null, lastOutcome: 'Timed out - nothing was sent.' });
-    }
-  }, timeoutMs);
-
+  armTimer(pending, timeoutMs);
   return pending;
+}
+
+/** Freeze the confirm timeout while Whisper is still chewing on "send". */
+export function pauseExpiry(): void {
+  if (!state.pending || paused) return;
+  remainingMs = Math.max(0, state.pending.expiresAt - Date.now());
+  clearTimer();
+  paused = true;
+}
+
+/** Continue the leftover timeout after STT finishes (or a non-match). */
+export function resumeExpiry(): void {
+  const pending = state.pending;
+  if (!pending || !paused) return;
+  paused = false;
+  if (remainingMs <= 0) {
+    publish({ pending: null, lastOutcome: 'Timed out - nothing was sent.' });
+    return;
+  }
+  armTimer(pending, remainingMs);
 }
 
 /** Runs the pending action. Returns the human-readable result, or null if nothing was pending. */
@@ -92,6 +122,7 @@ export async function commitPending(): Promise<string | null> {
   if (!pending) return null;
 
   clearTimer();
+  paused = false;
   publish({ pending: null });
 
   try {
@@ -108,6 +139,7 @@ export async function commitPending(): Promise<string | null> {
 export function cancelPending(reason = 'Cancelled - nothing was sent.'): void {
   if (!state.pending) return;
   clearTimer();
+  paused = false;
   publish({ pending: null, lastOutcome: reason });
 }
 
@@ -156,13 +188,21 @@ const CONFIRM_PHRASES = [
   'sure',
 ];
 
-/** Lowercase, strip punctuation, collapse whitespace. */
-function normalize(text: string): string {
+/** Lowercase; drop apostrophes so "don't" stays one token, then strip other punctuation. */
+export function normalizeDecisionText(text: string): string {
   return text
     .toLowerCase()
+    .replace(/['\u2019]/g, '')
     .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\bdon t\b/g, 'dont')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function containsPhrase(text: string, words: string[], phrase: string): boolean {
+  if (text === phrase || text.startsWith(`${phrase} `) || text.endsWith(` ${phrase}`)) return true;
+  if (text.includes(` ${phrase} `)) return true;
+  return phrase.split(' ').length === 1 && words.includes(phrase);
 }
 
 /**
@@ -170,20 +210,17 @@ function normalize(text: string): string {
  *
  * Deliberately strict: only short utterances count, so a dictated sentence that merely
  * contains the word "send" can never trigger a send. Cancel wins over confirm, which
- * makes "no, don't send that" safe.
+ * makes "don't send" and "no, don't send that" safe.
  */
 export function matchVoiceDecision(transcript: string): 'confirm' | 'cancel' | null {
-  const text = normalize(transcript);
+  const text = normalizeDecisionText(transcript);
   if (!text) return null;
 
   const words = text.split(' ');
   if (words.length > 4) return null;
 
-  const hasPhrase = (phrases: string[]): boolean =>
-    phrases.some((phrase) => text === phrase || words.includes(phrase) || text.startsWith(`${phrase} `));
-
-  if (hasPhrase(CANCEL_PHRASES)) return 'cancel';
-  if (hasPhrase(CONFIRM_PHRASES)) return 'confirm';
+  if (CANCEL_PHRASES.some((phrase) => containsPhrase(text, words, phrase))) return 'cancel';
+  if (CONFIRM_PHRASES.some((phrase) => containsPhrase(text, words, phrase))) return 'confirm';
   return null;
 }
 

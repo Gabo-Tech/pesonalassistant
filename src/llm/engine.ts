@@ -1,5 +1,6 @@
 import { initLlama, type LlamaContext } from 'llama.rn';
 import { recentTurns } from '../db/turns';
+import { fallbackAsk } from './fallback';
 import { buildSystemPrompt } from './prompt';
 import { parseReply, REPLY_SCHEMA, type AssistantReply } from './tools';
 
@@ -18,6 +19,7 @@ export type EngineStatus =
   | { state: 'error'; message: string };
 
 let context: LlamaContext | null = null;
+let loadedPath: string | null = null;
 let status: EngineStatus = { state: 'unloaded' };
 let loading: Promise<void> | null = null;
 
@@ -39,7 +41,8 @@ export const isLlmReady = (): boolean => status.state === 'ready';
 
 /** Loads the model. Safe to call repeatedly; concurrent calls share one load. */
 export async function loadLlm(modelPath: string): Promise<void> {
-  if (status.state === 'ready') return;
+  if (status.state === 'ready' && loadedPath === modelPath) return;
+  if (loadedPath && loadedPath !== modelPath) await unloadLlm();
   if (loading) return loading;
 
   loading = (async () => {
@@ -59,9 +62,11 @@ export async function loadLlm(modelPath: string): Promise<void> {
         (progress) => setStatus({ state: 'loading', progress: progress / 100 }),
       );
 
+      loadedPath = modelPath;
       setStatus({ state: 'ready', modelName: modelPath.split('/').pop() ?? 'model' });
     } catch (error) {
       context = null;
+      loadedPath = null;
       setStatus({
         state: 'error',
         message: error instanceof Error ? error.message : String(error),
@@ -78,6 +83,7 @@ export async function loadLlm(modelPath: string): Promise<void> {
 export async function unloadLlm(): Promise<void> {
   await context?.release();
   context = null;
+  loadedPath = null;
   setStatus({ state: 'unloaded' });
 }
 
@@ -89,7 +95,7 @@ export async function unloadLlm(): Promise<void> {
  * always parseable JSON with a valid tool name.
  */
 export async function ask(userText: string): Promise<AssistantReply> {
-  if (!context) throw new Error('Model is not loaded yet.');
+  if (!context) return fallbackAsk(userText);
 
   const history = await recentTurns(6);
 
@@ -114,5 +120,5 @@ export async function ask(userText: string): Promise<AssistantReply> {
     n_predict: 256,
   });
 
-  return parseReply(result.content ?? result.text ?? '');
+  return parseReply(result.text || result.content || '');
 }

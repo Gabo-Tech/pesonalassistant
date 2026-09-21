@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="send_crawler_description">After you confirm a message in Assistant, taps Send once in WhatsApp, Signal, or X. It does nothing until you confirm, and it does not read other chats.</string>
+  <string name="listen_channel_name">Wake word</string>
+  <string name="listen_notification_title">Assistant is listening</string>
+  <string name="listen_notification_body">Waiting for your wake word. Tap to open the app.</string>
+</resources>

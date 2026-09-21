@@ -140,6 +140,21 @@ export function deleteModel(spec: ModelSpec): void {
   if (file.exists) file.delete();
 }
 
+/** Copies a GGUF / Whisper bin the user already has (USB, Files app, PC). */
+export async function importModel(spec: ModelSpec, sourceUri: string): Promise<string> {
+  ensureModelsDir();
+  const destination = modelFile(spec);
+  if (destination.exists) destination.delete();
+  await new File(sourceUri).copy(destination);
+  if (!isDownloaded(spec)) {
+    if (destination.exists) destination.delete();
+    throw new Error(
+      `Imported file is too small or the wrong type. Expected about ${formatBytes(spec.bytes)}.`,
+    );
+  }
+  return destination.uri;
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes >= 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(2)} GB`;
   if (bytes >= 1_000_000) return `${Math.round(bytes / 1_000_000)} MB`;

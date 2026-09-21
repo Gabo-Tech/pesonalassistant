@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useState } from 'react';
+import type { Appearance } from '../ui/theme';
 
 export type WakeEngine = 'off' | 'whisper' | 'porcupine';
 
@@ -25,6 +26,8 @@ export type Settings = {
   calendarId: string | null;
   /** Whether the user opted into the Accessibility auto-tap-send service. */
   sendCrawlerEnabled: boolean;
+  /** Japandi UI. Dark is the product default, independent of the OS scheme. */
+  appearance: Appearance;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -41,6 +44,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sttModelPath: null,
   calendarId: null,
   sendCrawlerEnabled: false,
+  appearance: 'dark',
 };
 
 const STORAGE_KEY = 'assistant.settings.v1';
@@ -78,7 +82,12 @@ export async function saveSettings(patch: Partial<Settings>): Promise<Settings> 
   return next;
 }
 
-/** React binding: current settings plus an updater that persists. */
+export function subscribeSettings(fn: (s: Settings) => void): () => void {
+  listeners.add(fn);
+  fn(peekSettings());
+  return () => listeners.delete(fn);
+}
+
 export function useSettings(): [Settings, (patch: Partial<Settings>) => Promise<void>, boolean] {
   const [settings, setSettings] = useState<Settings>(() => peekSettings());
   const [ready, setReady] = useState(cache !== null);

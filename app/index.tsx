@@ -1,23 +1,28 @@
 import { Link } from 'expo-router';
-import { useCallback } from 'react';
-import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useBoot } from '../src/boot';
 import { commitPending } from '../src/share/confirmGate';
 import { useGate } from '../src/share/useGate';
 import { useSettings } from '../src/settings/store';
+import { Bento, BentoLabel, GUTTER, InkSwitch, PAGE_MARGIN } from '../src/ui/Bento';
 import { ConfirmCard } from '../src/ui/ConfirmCard';
 import { Orb } from '../src/ui/Orb';
-import { theme } from '../src/ui/theme';
+import { useTheme } from '../src/ui/ThemeProvider';
+import { Body, Meta } from '../src/ui/Type';
 import { voiceSession } from '../src/voice/session';
 import { useVoice } from '../src/voice/VoiceProvider';
 
 export default function HomeScreen() {
+  const t = useTheme();
   const boot = useBoot();
   const gate = useGate();
-  const { snapshot, micGranted, setListening, pushToTalk } = useVoice();
+  const { snapshot, micGranted, isStreaming, backgroundListenOk, setListening, pushToTalk } =
+    useVoice();
   const [settings, updateSettings] = useSettings();
+  const [typed, setTyped] = useState('');
 
-  const listening = snapshot.state !== 'off';
+  const listening = settings.alwaysListening;
 
   const toggleListening = useCallback(
     async (on: boolean) => {
@@ -27,139 +32,176 @@ export default function HomeScreen() {
     [setListening, updateSettings],
   );
 
-  const engineLine = describeEngine(boot);
+  const alerts: string[] = [];
+  if (boot.needsModels) {
+    alerts.push(
+      'No models downloaded yet. Typed commands still work. Open Settings to download speech and the language model.',
+    );
+  }
+  if (micGranted === false) {
+    alerts.push('Microphone permission denied. Voice input will not work.');
+  }
+  if (backgroundListenOk === false && settings.alwaysListening) {
+    alerts.push(
+      'Notification permission denied. Listening works in the app, but Android will mute the microphone after you leave.',
+    );
+  }
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      {boot.needsModels && (
-        <Link href="/settings" style={styles.banner}>
-          <Text style={styles.bannerText}>
-            No models on this phone yet. Open Settings to download them.
-          </Text>
-        </Link>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: t.bg }}
+      contentContainerStyle={styles.grid}
+    >
+      {alerts.length > 0 && (
+        <Bento span={2} style={{ gap: 10 }}>
+          <BentoLabel>Notice</BentoLabel>
+          {alerts.map((line) => (
+            <Body key={line}>{line}</Body>
+          ))}
+          {boot.needsModels ? (
+            <Link href="/settings">
+              <Meta style={{ color: t.ink }}>Open settings</Meta>
+            </Link>
+          ) : null}
+        </Bento>
       )}
 
-      {micGranted === false && (
-        <View style={[styles.banner, styles.bannerBad]}>
-          <Text style={styles.bannerText}>
-            Microphone permission denied. Voice input will not work.
-          </Text>
-        </View>
-      )}
+      <Bento span={1} style={styles.halfInner}>
+        <BentoLabel>Listen</BentoLabel>
+        <Body style={{ marginBottom: 12 }}>
+          Always listen for “{settings.wakeWord}”
+        </Body>
+        <InkSwitch value={listening} onValueChange={(on) => void toggleListening(on)} />
+      </Bento>
 
-      <Orb
-        state={snapshot.state}
-        active={snapshot.hearingSpeech}
-        onPress={() => void pushToTalk()}
-      />
+      <Bento span={1} style={styles.halfInner}>
+        <BentoLabel>Model</BentoLabel>
+        <Body>{describeEngine(boot)}</Body>
+      </Bento>
 
-      <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>
-          Always listen for &ldquo;{settings.wakeWord}&rdquo;
-        </Text>
-        <Switch
-          value={listening}
-          onValueChange={(on) => void toggleListening(on)}
-          trackColor={{ true: theme.accentDim, false: theme.border }}
-          thumbColor={listening ? theme.accent : theme.textDim}
+      <Bento span={2}>
+        <Orb
+          state={snapshot.state}
+          active={snapshot.hearingSpeech}
+          onPress={() => void pushToTalk()}
         />
-      </View>
+      </Bento>
+
+      <Bento span={1} style={{ minHeight: 120 }}>
+        <BentoLabel>You</BentoLabel>
+        <Body style={snapshot.heard ? undefined : { color: t.dim }}>
+          {snapshot.heard || 'Nothing heard yet'}
+        </Body>
+      </Bento>
+
+      <Bento span={1} style={{ minHeight: 120 }}>
+        <BentoLabel>Assistant</BentoLabel>
+        <Body style={snapshot.said ? undefined : { color: t.dim }}>
+          {snapshot.said || 'Waiting'}
+        </Body>
+      </Bento>
 
       {gate.pending && (
         <ConfirmCard
           pending={gate.pending}
-          voiceHint={settings.voiceConfirm && listening}
-          onConfirm={() => void commitPending()}
+          voiceHint={settings.voiceConfirm}
+          micReady={isStreaming}
+          onConfirm={() =>
+            void commitPending().then((msg) => {
+              if (msg) voiceSession.say(msg);
+            })
+          }
           onCancel={() => voiceSession.cancelConfirmation()}
         />
       )}
 
-      {snapshot.heard !== '' && (
-        <View style={styles.bubbleUser}>
-          <Text style={styles.bubbleLabel}>You</Text>
-          <Text style={styles.bubbleText}>{snapshot.heard}</Text>
-        </View>
-      )}
-
-      {snapshot.said !== '' && (
-        <View style={styles.bubbleAssistant}>
-          <Text style={styles.bubbleLabel}>Assistant</Text>
-          <Text style={styles.bubbleText}>{snapshot.said}</Text>
-        </View>
-      )}
-
-      {gate.lastOutcome && <Text style={styles.outcome}>{gate.lastOutcome}</Text>}
+      {gate.lastOutcome ? (
+        <Bento span={2}>
+          <Meta>Outcome</Meta>
+          <Body style={{ marginTop: 8 }}>{gate.lastOutcome}</Body>
+        </Bento>
+      ) : null}
 
       {(snapshot.error || boot.error) && (
-        <Text style={styles.error}>{snapshot.error ?? boot.error}</Text>
+        <Bento span={2}>
+          <BentoLabel>Error</BentoLabel>
+          <Body>{snapshot.error ?? boot.error}</Body>
+        </Bento>
       )}
 
-      <Text style={styles.status}>{engineLine}</Text>
-      <Text style={styles.privacy}>
-        Speech and reasoning run on this phone. Nothing is sent anywhere until you
-        confirm.
-      </Text>
+      <Bento span={2} style={styles.composer}>
+        <TextInput
+          value={typed}
+          onChangeText={setTyped}
+          placeholder="Type a command if you would rather not speak"
+          placeholderTextColor={t.dim}
+          style={[styles.typedInput, { color: t.ink }]}
+          onSubmitEditing={() => {
+            const text = typed.trim();
+            if (!text) return;
+            setTyped('');
+            void voiceSession.submitText(text);
+          }}
+        />
+        <Pressable
+          style={[styles.go, { backgroundColor: t.inverse, borderRadius: t.radiusChip }]}
+          onPress={() => {
+            const text = typed.trim();
+            if (!text) return;
+            setTyped('');
+            void voiceSession.submitText(text);
+          }}
+        >
+          <Meta style={{ color: t.inverseInk }}>Go</Meta>
+        </Pressable>
+      </Bento>
+
+      <View style={styles.privacyWrap}>
+        <Meta style={{ textAlign: 'center', letterSpacing: 0.8, textTransform: 'none' }}>
+          Speech and reasoning run on this phone. Nothing is sent anywhere until you
+          confirm.
+        </Meta>
+      </View>
     </ScrollView>
   );
 }
 
 function describeEngine(boot: ReturnType<typeof useBoot>): string {
-  const stt = boot.sttReady ? 'speech ready' : 'speech not loaded';
+  const stt = boot.sttReady ? 'Speech ready' : 'Speech not loaded';
 
   switch (boot.engine.state) {
     case 'ready':
-      return `Model ${boot.engine.modelName} loaded, ${stt}.`;
+      return `${boot.engine.modelName} loaded. ${stt}.`;
     case 'loading':
-      return `Loading model ${Math.round(boot.engine.progress * 100)}%, ${stt}.`;
+      return `Loading model ${Math.round(boot.engine.progress * 100)}%. ${stt}.`;
     case 'error':
       return `Model failed: ${boot.engine.message}`;
     default:
-      return `No model loaded, ${stt}.`;
+      return `No model loaded. ${stt}.`;
   }
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: theme.bg },
-  content: { padding: 20, gap: 18, alignItems: 'center', paddingBottom: 48 },
-  banner: {
-    width: '100%',
-    backgroundColor: theme.surfaceAlt,
-    borderColor: theme.warn,
-    borderWidth: 1,
-    borderRadius: theme.radius,
-    padding: 12,
-  },
-  bannerBad: { borderColor: theme.bad },
-  bannerText: { color: theme.text, fontSize: 13 },
-  toggleRow: {
-    width: '100%',
+  grid: {
+    padding: PAGE_MARGIN,
+    gap: GUTTER,
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: theme.surface,
-    borderRadius: theme.radius,
-    paddingHorizontal: 16,
+    flexWrap: 'wrap',
+    paddingBottom: 48,
+  },
+  halfInner: { justifyContent: 'space-between' },
+  composer: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  typedInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 8,
+    paddingHorizontal: 0,
+  },
+  go: {
+    paddingHorizontal: 18,
     paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  toggleLabel: { color: theme.text, fontSize: 15, flexShrink: 1, paddingRight: 12 },
-  bubbleUser: {
-    width: '100%',
-    backgroundColor: theme.surface,
-    borderRadius: theme.radius,
-    padding: 14,
-    gap: 4,
-  },
-  bubbleAssistant: {
-    width: '100%',
-    backgroundColor: theme.surfaceAlt,
-    borderRadius: theme.radius,
-    padding: 14,
-    gap: 4,
-  },
-  bubbleLabel: { color: theme.textDim, fontSize: 11, textTransform: 'uppercase' },
-  bubbleText: { color: theme.text, fontSize: 16, lineHeight: 22 },
-  outcome: { color: theme.good, fontSize: 13, textAlign: 'center' },
-  error: { color: theme.bad, fontSize: 13, textAlign: 'center' },
-  status: { color: theme.textDim, fontSize: 12, textAlign: 'center' },
-  privacy: { color: theme.textDim, fontSize: 11, textAlign: 'center', opacity: 0.8 },
+  privacyWrap: { width: '100%', paddingTop: 8, paddingHorizontal: 8 },
 });

@@ -1,15 +1,17 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
-import { orbColor, theme } from './theme';
+import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { useTheme } from './ThemeProvider';
+import { orbInk } from './theme';
+import { Meta } from './Type';
 import type { SessionState } from '../voice/session';
 
 const LABEL: Record<SessionState, string> = {
   off: 'Tap to talk',
   idle: 'Listening for wake word',
-  listening: 'Listening...',
-  thinking: 'Thinking...',
+  listening: 'Listening',
+  thinking: 'Thinking',
   speaking: 'Speaking',
-  confirming: 'Waiting for your confirmation',
+  confirming: 'Waiting for confirmation',
 };
 
 export function Orb({
@@ -22,8 +24,10 @@ export function Orb({
   active: boolean;
   onPress: () => void;
 }) {
+  const t = useTheme();
   const pulse = useRef(new Animated.Value(0)).current;
   const busy = state === 'listening' || state === 'thinking' || active;
+  const { ring, fill } = orbInk(t, active && state === 'idle' ? 'listening' : state);
 
   useEffect(() => {
     if (!busy) {
@@ -36,13 +40,13 @@ export function Orb({
       Animated.sequence([
         Animated.timing(pulse, {
           toValue: 1,
-          duration: 700,
+          duration: 900,
           easing: Easing.inOut(Easing.quad),
           useNativeDriver: true,
         }),
         Animated.timing(pulse, {
           toValue: 0,
-          duration: 700,
+          duration: 900,
           easing: Easing.inOut(Easing.quad),
           useNativeDriver: true,
         }),
@@ -52,8 +56,8 @@ export function Orb({
     return () => loop.stop();
   }, [busy, pulse]);
 
-  const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] });
-  const color = orbColor[state];
+  const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
+  const ringOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] });
 
   return (
     <View style={styles.wrap}>
@@ -61,31 +65,31 @@ export function Orb({
         <Animated.View
           style={[
             styles.orb,
-            { borderColor: color, transform: [{ scale }], shadowColor: color },
+            {
+              borderColor: ring,
+              backgroundColor: t.surface,
+              transform: [{ scale }],
+              opacity: busy ? ringOpacity : 1,
+            },
           ]}
         >
-          <View style={[styles.core, { backgroundColor: color }]} />
+          {fill ? <View style={[styles.core, { backgroundColor: fill }]} /> : null}
         </Animated.View>
       </Pressable>
-      <Text style={styles.label}>{LABEL[state]}</Text>
+      <Meta>{LABEL[state]}</Meta>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { alignItems: 'center', gap: 14 },
+  wrap: { alignItems: 'center', gap: 16, paddingVertical: 8 },
   orb: {
-    width: 148,
-    height: 148,
-    borderRadius: 74,
-    borderWidth: 3,
+    width: 132,
+    height: 132,
+    borderRadius: 66,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.surface,
-    shadowOpacity: 0.5,
-    shadowRadius: 18,
-    elevation: 8,
   },
-  core: { width: 54, height: 54, borderRadius: 27, opacity: 0.9 },
-  label: { color: theme.textDim, fontSize: 14 },
+  core: { width: 72, height: 72, borderRadius: 36 },
 });

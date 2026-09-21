@@ -39,6 +39,18 @@ const withAssistantAndroid = (config) =>
         data: [{ $: { 'android:scheme': 'https' } }],
       },
       {
+        action: [{ $: { 'android:name': 'android.intent.action.VIEW' } }],
+        data: [{ $: { 'android:scheme': 'whatsapp' } }],
+      },
+      {
+        action: [{ $: { 'android:name': 'android.intent.action.VIEW' } }],
+        data: [{ $: { 'android:scheme': 'sgnl' } }],
+      },
+      {
+        action: [{ $: { 'android:name': 'android.intent.action.VIEW' } }],
+        data: [{ $: { 'android:scheme': 'twitter' } }],
+      },
+      {
         action: [{ $: { 'android:name': 'android.intent.action.SEND' } }],
         data: [{ $: { 'android:mimeType': 'text/plain' } }],
       },

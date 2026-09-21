@@ -1,17 +1,13 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import {
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { createNote, deleteNote, listNotes, searchNotes, type Note } from '../src/db/notes';
-import { theme } from '../src/ui/theme';
+import { Bento, GUTTER, PAGE_MARGIN } from '../src/ui/Bento';
+import { useTheme } from '../src/ui/ThemeProvider';
+import { Body, Display, Meta } from '../src/ui/Type';
 
 export default function NotesScreen() {
+  const t = useTheme();
   const [notes, setNotes] = useState<Note[]>([]);
   const [query, setQuery] = useState('');
   const [draft, setDraft] = useState('');
@@ -20,12 +16,18 @@ export default function NotesScreen() {
     setNotes(query.trim() ? await searchNotes(query.trim()) : await listNotes());
   }, [query]);
 
-  // Re-read on every focus so notes created by voice show up immediately.
   useFocusEffect(
     useCallback(() => {
       void refresh();
     }, [refresh]),
   );
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      void refresh();
+    }, 200);
+    return () => clearTimeout(handle);
+  }, [query, refresh]);
 
   const add = useCallback(async () => {
     const text = draft.trim();
@@ -38,45 +40,49 @@ export default function NotesScreen() {
   }, [draft, refresh]);
 
   return (
-    <View style={styles.screen}>
-      <View style={styles.composer}>
+    <View style={{ flex: 1, backgroundColor: t.bg, padding: PAGE_MARGIN, gap: GUTTER }}>
+      <Bento span={2} style={styles.composer}>
         <TextInput
           value={draft}
           onChangeText={setDraft}
           placeholder="Write a note"
-          placeholderTextColor={theme.textDim}
-          style={styles.input}
+          placeholderTextColor={t.dim}
+          style={[styles.input, { color: t.ink }]}
           multiline
         />
-        <Pressable style={styles.addButton} onPress={() => void add()}>
-          <Text style={styles.addText}>Add</Text>
+        <Pressable
+          style={[styles.add, { backgroundColor: t.inverse, borderRadius: t.radiusChip }]}
+          onPress={() => void add()}
+        >
+          <Meta style={{ color: t.inverseInk }}>Add</Meta>
         </Pressable>
-      </View>
+      </Bento>
 
-      <TextInput
-        value={query}
-        onChangeText={(text) => {
-          setQuery(text);
-        }}
-        onSubmitEditing={() => void refresh()}
-        placeholder="Search notes"
-        placeholderTextColor={theme.textDim}
-        style={[styles.input, styles.search]}
-      />
+      <Bento span={2}>
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search notes"
+          placeholderTextColor={t.dim}
+          style={[styles.input, { color: t.ink, paddingVertical: 0 }]}
+        />
+      </Bento>
 
       <FlatList
         data={notes}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={styles.list}
-        ListEmptyComponent={<Text style={styles.empty}>No notes yet.</Text>}
+        contentContainerStyle={{ gap: GUTTER, paddingBottom: 24 }}
+        ListEmptyComponent={
+          <Meta style={{ textAlign: 'center', marginTop: 32 }}>No notes yet</Meta>
+        }
         renderItem={({ item }) => (
-          <View style={styles.note}>
-            <View style={styles.noteBody}>
-              <Text style={styles.noteTitle}>{item.title}</Text>
-              {item.body ? <Text style={styles.noteText}>{item.body}</Text> : null}
-              <Text style={styles.noteDate}>
+          <Bento span={2} style={styles.note}>
+            <View style={{ flex: 1, gap: 6 }}>
+              <Display style={{ fontSize: 22, lineHeight: 28 }}>{item.title}</Display>
+              {item.body ? <Body style={{ color: t.dim }}>{item.body}</Body> : null}
+              <Body style={{ color: t.dim, fontSize: 11, lineHeight: 16 }}>
                 {new Date(item.updated_at).toLocaleString()}
-              </Text>
+              </Body>
             </View>
             <Pressable
               onPress={async () => {
@@ -85,9 +91,9 @@ export default function NotesScreen() {
               }}
               hitSlop={10}
             >
-              <Text style={styles.delete}>Delete</Text>
+              <Meta>Delete</Meta>
             </Pressable>
-          </View>
+          </Bento>
         )}
       />
     </View>
@@ -95,38 +101,19 @@ export default function NotesScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: theme.bg, padding: 16, gap: 12 },
   composer: { flexDirection: 'row', gap: 10, alignItems: 'flex-end' },
   input: {
     flex: 1,
-    backgroundColor: theme.surface,
-    borderRadius: theme.radius,
-    color: theme.text,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
     fontSize: 15,
+    paddingHorizontal: 0,
+    paddingVertical: 4,
     maxHeight: 120,
   },
-  search: { flex: 0 },
-  addButton: {
-    backgroundColor: theme.accent,
-    borderRadius: theme.radius,
+  add: {
     paddingHorizontal: 18,
-    paddingVertical: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  addText: { color: '#fff', fontWeight: '700' },
-  list: { gap: 10, paddingBottom: 24 },
-  note: {
-    flexDirection: 'row',
-    gap: 12,
-    backgroundColor: theme.surface,
-    borderRadius: theme.radius,
-    padding: 14,
-  },
-  noteBody: { flex: 1, gap: 4 },
-  noteTitle: { color: theme.text, fontSize: 16, fontWeight: '600' },
-  noteText: { color: theme.textDim, fontSize: 14, lineHeight: 20 },
-  noteDate: { color: theme.textDim, fontSize: 11, opacity: 0.7 },
-  delete: { color: theme.bad, fontSize: 13 },
-  empty: { color: theme.textDim, textAlign: 'center', marginTop: 32 },
+  note: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
 });

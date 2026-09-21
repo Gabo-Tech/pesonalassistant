@@ -27,6 +27,7 @@
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
+    "send-crawler": "file:modules/send-crawler",
     "whisper.rn": "^0.7.4"
   },
   "devDependencies": {
@@ -39,6 +40,7 @@
     "prebuild": "expo prebuild --platform android",
     "prebuild:clean": "expo prebuild --platform android --clean",
     "typecheck": "tsc --noEmit",
+    "test": "node --test --experimental-strip-types src/voice/wake.test.ts src/voice/sessionLogic.test.ts src/share/confirmGate.test.ts src/llm/time.test.ts src/llm/fallback.test.ts src/llm/match.test.ts",
     "apk": "cd android && ./gradlew assembleRelease"
   },
   "private": true

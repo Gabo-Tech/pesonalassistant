@@ -39,3 +39,10 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+modules/**/android/build/
+modules/**/android/.cxx/
+modules/**/.gradle/
+
+# built binaries (hosted on GitHub Releases, not in git)
+*.apk
+*.aab

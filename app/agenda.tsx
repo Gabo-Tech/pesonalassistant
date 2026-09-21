@@ -1,12 +1,15 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ensureCalendarPermission, listEvents, type SimpleEvent } from '../src/calendar/events';
 import { completeReminder, listReminders, type Reminder } from '../src/db/reminders';
 import { formatWhen } from '../src/llm/time';
-import { theme } from '../src/ui/theme';
+import { Bento, GUTTER, PAGE_MARGIN } from '../src/ui/Bento';
+import { useTheme } from '../src/ui/ThemeProvider';
+import { Body, Display, Meta } from '../src/ui/Type';
 
 export default function AgendaScreen() {
+  const t = useTheme();
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [events, setEvents] = useState<SimpleEvent[]>([]);
   const [calendarDenied, setCalendarDenied] = useState(false);
@@ -32,14 +35,21 @@ export default function AgendaScreen() {
   );
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.heading}>Reminders</Text>
-      {reminders.length === 0 && <Text style={styles.empty}>Nothing pending.</Text>}
+    <ScrollView
+      style={{ flex: 1, backgroundColor: t.bg }}
+      contentContainerStyle={styles.content}
+    >
+      <Display style={{ fontSize: 28, marginBottom: 4, width: '100%' }}>Reminders</Display>
+      {reminders.length === 0 && (
+        <Bento span={2}>
+          <Meta>Nothing pending</Meta>
+        </Bento>
+      )}
       {reminders.map((reminder) => (
-        <View key={reminder.id} style={styles.row}>
-          <View style={styles.rowBody}>
-            <Text style={styles.rowTitle}>{reminder.text}</Text>
-            <Text style={styles.rowMeta}>{formatWhen(reminder.due_at)}</Text>
+        <Bento key={reminder.id} span={2} style={styles.row}>
+          <View style={{ flex: 1, gap: 6 }}>
+            <Body>{reminder.text}</Body>
+            <Meta>{formatWhen(reminder.due_at)}</Meta>
           </View>
           <Pressable
             onPress={async () => {
@@ -47,52 +57,46 @@ export default function AgendaScreen() {
               await refresh();
             }}
             hitSlop={10}
+            style={{ justifyContent: 'center' }}
           >
-            <Text style={styles.done}>Done</Text>
+            <Meta style={{ color: t.ink }}>Done</Meta>
           </Pressable>
-        </View>
+        </Bento>
       ))}
 
-      <Text style={[styles.heading, styles.headingSpaced]}>Next 7 days</Text>
+      <Display style={{ fontSize: 28, marginTop: 12, marginBottom: 4, width: '100%' }}>
+        Next 7 days
+      </Display>
       {calendarDenied && (
-        <Text style={styles.empty}>
-          Calendar permission denied, so events cannot be shown.
-        </Text>
+        <Bento span={2}>
+          <Body>Calendar permission denied, so events cannot be shown.</Body>
+        </Bento>
       )}
       {!calendarDenied && events.length === 0 && (
-        <Text style={styles.empty}>No events.</Text>
+        <Bento span={2}>
+          <Meta>No events</Meta>
+        </Bento>
       )}
       {events.map((event) => (
-        <View key={event.id} style={styles.row}>
-          <View style={styles.rowBody}>
-            <Text style={styles.rowTitle}>{event.title}</Text>
-            <Text style={styles.rowMeta}>
-              {event.allDay ? 'All day' : formatWhen(event.start)}
-              {event.location ? ` - ${event.location}` : ''}
-            </Text>
-          </View>
-        </View>
+        <Bento key={event.id} span={2} style={{ gap: 6 }}>
+          <Body>{event.title}</Body>
+          <Meta>
+            {event.allDay ? 'All day' : formatWhen(event.start)}
+            {event.location ? ` — ${event.location}` : ''}
+          </Meta>
+        </Bento>
       ))}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: theme.bg },
-  content: { padding: 16, gap: 10, paddingBottom: 40 },
-  heading: { color: theme.text, fontSize: 18, fontWeight: '700' },
-  headingSpaced: { marginTop: 18 },
-  empty: { color: theme.textDim, fontSize: 14 },
-  row: {
+  content: {
+    padding: PAGE_MARGIN,
+    gap: GUTTER,
+    paddingBottom: 40,
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: theme.surface,
-    borderRadius: theme.radius,
-    padding: 14,
+    flexWrap: 'wrap',
   },
-  rowBody: { flex: 1, gap: 3 },
-  rowTitle: { color: theme.text, fontSize: 15, fontWeight: '600' },
-  rowMeta: { color: theme.textDim, fontSize: 12 },
-  done: { color: theme.good, fontSize: 13, fontWeight: '600' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
 });

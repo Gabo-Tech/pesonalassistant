@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { getDb } from './db';
 import { loadLlm, subscribeEngine, type EngineStatus } from './llm/engine';
 import { MODELS, localPath, type ModelSpec } from './models/catalog';
 import { prepareNotifications } from './notify';
-import { loadSettings, peekSettings } from './settings/store';
-import { isSttReady, loadStt } from './voice/stt';
+import { loadSettings, peekSettings, subscribeSettings } from './settings/store';
+import { isSttReady, loadStt, subscribeStt } from './voice/stt';
 
 /**
  * Picks which downloaded model to use: the one chosen in Settings if it is still
@@ -33,20 +33,31 @@ export type BootState = {
   error: string | null;
 };
 
+const BootContext = createContext<BootState | null>(null);
+
+function modelsMissing(): boolean {
+  return resolveModel('llm') === null || resolveModel('stt') === null;
+}
+
 /**
- * Runs once at app start: open the database, ask for notification permission, and
- * load whichever models the user has already downloaded.
+ * Runs once at app start (root layout): open the database, ask for notification
+ * permission, and load whichever models the user has already downloaded.
  */
-export function useBoot(): BootState {
+export function BootProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<BootState>({
     ready: false,
     engine: { state: 'unloaded' },
-    sttReady: false,
+    sttReady: isSttReady(),
     needsModels: false,
     error: null,
   });
 
   useEffect(() => subscribeEngine((engine) => setState((prev) => ({ ...prev, engine }))), []);
+  useEffect(() => subscribeStt((sttReady) => setState((prev) => ({ ...prev, sttReady }))), []);
+  useEffect(
+    () => subscribeSettings(() => setState((prev) => ({ ...prev, needsModels: modelsMissing() }))),
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -61,10 +72,12 @@ export function useBoot(): BootState {
         const stt = resolveModel('stt');
 
         if (cancelled) return;
-        setState((prev) => ({ ...prev, ready: true, needsModels: !llm || !stt }));
+        setState((prev) => ({
+          ...prev,
+          ready: true,
+          needsModels: !llm || !stt,
+        }));
 
-        // Speech first: it is ~30MB and makes the app feel alive quickly, while the
-        // LLM can take several seconds to memory-map.
         if (stt) {
           await loadStt(stt.path);
           if (!cancelled) setState((prev) => ({ ...prev, sttReady: isSttReady() }));
@@ -87,5 +100,11 @@ export function useBoot(): BootState {
     };
   }, []);
 
-  return state;
+  return <BootContext.Provider value={state}>{children}</BootContext.Provider>;
+}
+
+export function useBoot(): BootState {
+  const value = useContext(BootContext);
+  if (!value) throw new Error('useBoot must be used inside <BootProvider>');
+  return value;
 }

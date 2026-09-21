@@ -5,6 +5,7 @@ import { requestConfirm } from '../share/confirmGate';
 import { armSend } from '../share/crawler';
 import { openDraft, TARGETS, type ShareTarget } from '../share/intents';
 import { peekSettings } from '../settings/store';
+import { findUniqueMatch } from './match';
 import { formatWhen, parseWhen } from './time';
 import type { Action } from './tools';
 
@@ -32,8 +33,20 @@ export async function routeAction(action: Action, fallbackSay: string): Promise<
     }
 
     case 'append_note': {
-      if (!action.id || !action.text) return ok('I need which note to add to.');
-      await appendToNote(action.id, action.text);
+      const extra = action.text?.trim();
+      if (!extra) return ok('What should I add to the note?');
+
+      let id = action.id;
+      if (!id) {
+        const query = action.title?.trim() || action.query?.trim();
+        if (!query) return ok('Which note should I add to?');
+        const found = await searchNotes(query);
+        const match = findUniqueMatch(found, query, (note) => note.title);
+        if (!match) return ok('I could not tell which note you mean.');
+        id = match.id;
+      }
+
+      await appendToNote(id, extra);
       return ok('Added to the note.');
     }
 
@@ -80,13 +93,24 @@ export async function routeAction(action: Action, fallbackSay: string): Promise<
       const rows = await listReminders();
       if (rows.length === 0) return ok('No reminders pending.');
       return ok(
-        `${rows.length} pending. Next: ${rows[0].text} at ${formatWhen(rows[0].due_at)}.`,
+        `${rows.length} pending: ${rows
+          .slice(0, 5)
+          .map((row) => `${row.text} at ${formatWhen(row.due_at)}`)
+          .join('; ')}.`,
       );
     }
 
     case 'complete_reminder': {
-      if (!action.id) return ok('Which reminder should I complete?');
-      await completeReminder(action.id);
+      let id = action.id;
+      if (!id) {
+        const query = action.text?.trim() || action.title?.trim() || action.query?.trim();
+        if (!query) return ok('Which reminder should I complete?');
+        const rows = await listReminders();
+        const match = findUniqueMatch(rows, query, (row) => row.text);
+        if (!match) return ok('I could not tell which reminder you mean.');
+        id = match.id;
+      }
+      await completeReminder(id);
       return ok('Marked done.');
     }
 

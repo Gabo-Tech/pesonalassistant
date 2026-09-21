@@ -3,24 +3,42 @@ import { initWhisper, type WhisperContext } from 'whisper.rn';
 /**
  * Speech to text with whisper.cpp, fully offline.
  *
- * whisper expects 16 kHz mono audio. We request exactly that from the microphone so
- * there is no resampling step, and hand it raw float32 PCM through `transcribeData`.
+ * whisper expects 16 kHz mono audio. The microphone hook resamples to that rate
+ * before we get here, so transcribeData always sees 16 kHz float32 PCM.
  */
 
 export const WHISPER_SAMPLE_RATE = 16_000;
 
 let context: WhisperContext | null = null;
+let loadedPath: string | null = null;
 let loading: Promise<void> | null = null;
 
+const sttListeners = new Set<(ready: boolean) => void>();
+
+function publishStt(): void {
+  const ready = context !== null;
+  sttListeners.forEach((fn) => fn(ready));
+}
+
+export function subscribeStt(fn: (ready: boolean) => void): () => void {
+  sttListeners.add(fn);
+  fn(context !== null);
+  return () => sttListeners.delete(fn);
+}
+
 export const isSttReady = (): boolean => context !== null;
+export const sttLoadedPath = (): string | null => loadedPath;
 
 export async function loadStt(modelPath: string): Promise<void> {
-  if (context) return;
+  if (context && loadedPath === modelPath) return;
+  if (context && loadedPath !== modelPath) await unloadStt();
   if (loading) return loading;
 
   loading = (async () => {
     try {
       context = await initWhisper({ filePath: modelPath });
+      loadedPath = modelPath;
+      publishStt();
     } finally {
       loading = null;
     }
@@ -32,6 +50,8 @@ export async function loadStt(modelPath: string): Promise<void> {
 export async function unloadStt(): Promise<void> {
   await context?.release();
   context = null;
+  loadedPath = null;
+  publishStt();
 }
 
 /**

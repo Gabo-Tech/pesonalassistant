@@ -17,12 +17,12 @@ Available tools and their fields:
 - none: just talk. Use for greetings, questions, chit-chat.
 - create_note: title, text
 - search_notes: query
-- append_note: id, text
+- append_note: title or id, text
 - create_event: title, when, duration_minutes
 - list_events: when (optional)
 - create_reminder: text, when
 - list_reminders
-- complete_reminder: id
+- complete_reminder: text (the reminder wording) or id
 - draft_whatsapp: recipient, text
 - draft_signal: recipient, text
 - draft_tweet: text

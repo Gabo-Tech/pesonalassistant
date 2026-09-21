@@ -16,8 +16,16 @@ export type Reminder = {
  * exists so the assistant can list and complete reminders.
  */
 export async function createReminder(text: string, dueAt: number): Promise<Reminder> {
-  const db = await getDb();
+  if (dueAt <= Date.now()) {
+    throw new Error('That time has already passed.');
+  }
+
   const notificationId = await scheduleReminderNotification(text, dueAt);
+  if (!notificationId) {
+    throw new Error('Cannot set a reminder without notification permission.');
+  }
+
+  const db = await getDb();
   const ts = now();
 
   const result = await db.runAsync(

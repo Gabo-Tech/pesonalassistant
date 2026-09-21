@@ -1,5 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { theme } from './theme';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { useTheme } from './ThemeProvider';
+import { Bento, BentoLabel } from './Bento';
+import { Body, Meta } from './Type';
 import type { Pending } from '../share/confirmGate';
 
 /**
@@ -9,55 +11,67 @@ import type { Pending } from '../share/confirmGate';
 export function ConfirmCard({
   pending,
   voiceHint,
+  micReady,
   onConfirm,
   onCancel,
 }: {
   pending: Pending;
   /** Whether spoken confirmation is currently accepted. */
   voiceHint: boolean;
+  /** Mic stream is actually running, so "say send" is true. */
+  micReady: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const t = useTheme();
+
   return (
-    <View style={styles.card}>
-      <Text style={styles.kicker}>{pending.summary}</Text>
-      <Text style={styles.detail}>{pending.detail}</Text>
+    <Bento span={2} style={{ gap: 12 }}>
+      <BentoLabel>Confirm</BentoLabel>
+      <Body>{pending.summary}</Body>
+      <Body style={{ color: t.dim }}>{pending.detail}</Body>
 
       <View style={styles.row}>
-        <Pressable style={[styles.button, styles.cancel]} onPress={onCancel}>
-          <Text style={styles.cancelText}>Cancel</Text>
+        <Pressable
+          style={[
+            styles.button,
+            {
+              borderRadius: t.radiusChip,
+              borderWidth: StyleSheet.hairlineWidth,
+              borderColor: t.line,
+              backgroundColor: 'transparent',
+            },
+          ]}
+          onPress={onCancel}
+        >
+          <Meta style={{ color: t.dim }}>Cancel</Meta>
         </Pressable>
-        <Pressable style={[styles.button, styles.confirm]} onPress={onConfirm}>
-          <Text style={styles.confirmText}>{pending.confirmLabel}</Text>
+        <Pressable
+          style={[
+            styles.button,
+            {
+              borderRadius: t.radiusChip,
+              backgroundColor: t.inverse,
+            },
+          ]}
+          onPress={onConfirm}
+        >
+          <Meta style={{ color: t.inverseInk }}>{pending.confirmLabel}</Meta>
         </Pressable>
       </View>
 
-      <Text style={styles.hint}>
-        {voiceHint
-          ? 'Tap a button, or say "send" or "cancel".'
-          : 'Voice confirmation is off. Use the buttons.'}
-      </Text>
-    </View>
+      <Meta>
+        {voiceHint && micReady
+          ? 'Tap a button, or say send or cancel'
+          : voiceHint
+            ? 'Tap a button, or type send / cancel'
+            : 'Voice confirmation is off. Use the buttons'}
+      </Meta>
+    </Bento>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    width: '100%',
-    backgroundColor: theme.surfaceAlt,
-    borderRadius: theme.radius,
-    borderWidth: 1,
-    borderColor: theme.warn,
-    padding: 16,
-    gap: 10,
-  },
-  kicker: { color: theme.warn, fontWeight: '700', fontSize: 13, letterSpacing: 0.5 },
-  detail: { color: theme.text, fontSize: 16, lineHeight: 22 },
   row: { flexDirection: 'row', gap: 10, marginTop: 4 },
-  button: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
-  cancel: { backgroundColor: 'transparent', borderWidth: 1, borderColor: theme.border },
-  confirm: { backgroundColor: theme.accent },
-  cancelText: { color: theme.textDim, fontWeight: '600' },
-  confirmText: { color: '#fff', fontWeight: '700' },
-  hint: { color: theme.textDim, fontSize: 12 },
+  button: { flex: 1, paddingVertical: 14, alignItems: 'center' },
 });

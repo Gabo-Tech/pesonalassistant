@@ -16,9 +16,13 @@ export type SimpleEvent = {
   location?: string;
 };
 
-export async function ensureCalendarPermission(): Promise<boolean> {
+export async function hasCalendarPermission(): Promise<boolean> {
   const current = await Calendar.getCalendarPermissions();
-  if (current.granted) return true;
+  return current.granted;
+}
+
+export async function ensureCalendarPermission(): Promise<boolean> {
+  if (await hasCalendarPermission()) return true;
   const asked = await Calendar.requestCalendarPermissions();
   return asked.granted;
 }
@@ -81,7 +85,8 @@ export async function createEvent(input: {
 }
 
 export async function listEvents(fromMs: number, toMs: number): Promise<SimpleEvent[]> {
-  const calendars = await writableCalendars();
+  if (!(await ensureCalendarPermission())) return [];
+  const calendars = await Calendar.getCalendars(Calendar.EntityTypes.EVENT);
   if (calendars.length === 0) return [];
 
   const events = await Calendar.listEvents(calendars, new Date(fromMs), new Date(toMs));

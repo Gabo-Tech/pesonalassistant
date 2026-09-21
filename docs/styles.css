@@ -1,0 +1,120 @@
+:root {
+  --bg: #0c0c0c;
+  --surface: #161616;
+  --ink: #f4f1ea;
+  --dim: #8a8680;
+  --line: #2c2c2c;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  line-height: 1.55;
+  letter-spacing: 0.01em;
+}
+
+.page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 72px 24px 96px;
+}
+
+.kicker {
+  font-size: 11px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 18px;
+}
+
+h1 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 42px;
+  font-weight: 400;
+  letter-spacing: -0.5px;
+  line-height: 1.15;
+  margin-bottom: 18px;
+}
+
+.pitch {
+  color: var(--dim);
+  font-size: 17px;
+  max-width: 36em;
+  margin-bottom: 36px;
+}
+
+.tile {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 28px;
+  margin-bottom: 16px;
+}
+
+.download {
+  display: inline-block;
+  background: var(--ink);
+  color: var(--bg);
+  text-decoration: none;
+  font-size: 11px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  padding: 14px 22px;
+  border-radius: 12px;
+}
+
+.download:hover {
+  opacity: 0.88;
+}
+
+.meta {
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.notes {
+  list-style: none;
+  display: grid;
+  gap: 12px;
+  color: var(--dim);
+  font-size: 14px;
+}
+
+.notes li {
+  padding-left: 0;
+}
+
+.notes strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.foot {
+  margin-top: 40px;
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.foot a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.foot a:hover {
+  text-decoration: underline;
+}

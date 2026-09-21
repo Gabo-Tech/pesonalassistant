@@ -33,7 +33,7 @@ export async function prepareNotifications(): Promise<boolean> {
       name: 'Reminders',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#7C5CFF',
+      lightColor: '#F4F1EA',
       // Leave `sound` unset: expo-notifications treats a string here as the name of a
       // bundled custom sound file, so 'default' would look for default.wav and warn.
     });
@@ -52,7 +52,8 @@ export async function scheduleReminderNotification(
   text: string,
   dueAt: number,
 ): Promise<string | null> {
-  await prepareNotifications();
+  const granted = await prepareNotifications();
+  if (!granted) return null;
 
   // A past date would fire immediately (or be dropped); callers validate, we just guard.
   if (dueAt <= Date.now()) return null;
