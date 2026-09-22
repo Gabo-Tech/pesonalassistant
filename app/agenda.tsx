@@ -2,19 +2,22 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ensureCalendarPermission, listEvents, type SimpleEvent } from '../src/calendar/events';
+import { cancelAlarm, listAlarms, type Alarm } from '../src/db/alarms';
 import { completeReminder, listReminders, type Reminder } from '../src/db/reminders';
-import { formatWhen } from '../src/llm/time';
+import { formatClockTime, formatWhen } from '../src/llm/time';
 import { Bento, GUTTER, PAGE_MARGIN } from '../src/ui/Bento';
 import { useTheme } from '../src/ui/ThemeProvider';
 import { Body, Display, Meta } from '../src/ui/Type';
 
 export default function AgendaScreen() {
   const t = useTheme();
+  const [alarms, setAlarms] = useState<Alarm[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [events, setEvents] = useState<SimpleEvent[]>([]);
   const [calendarDenied, setCalendarDenied] = useState(false);
 
   const refresh = useCallback(async () => {
+    setAlarms(await listAlarms());
     setReminders(await listReminders());
 
     const granted = await ensureCalendarPermission();
@@ -39,7 +42,39 @@ export default function AgendaScreen() {
       style={{ flex: 1, backgroundColor: t.bg }}
       contentContainerStyle={styles.content}
     >
-      <Display style={{ fontSize: 28, marginBottom: 4, width: '100%' }}>Reminders</Display>
+      <Display style={{ fontSize: 28, marginBottom: 4, width: '100%' }}>Alarms</Display>
+      {alarms.length === 0 && (
+        <Bento span={2}>
+          <Meta>None set</Meta>
+        </Bento>
+      )}
+      {alarms.map((alarm) => (
+        <Bento key={alarm.id} span={2} style={styles.row}>
+          <View style={{ flex: 1, gap: 6 }}>
+            <Body>{formatClockTime(alarm.hour, alarm.minute)}</Body>
+            <Meta>
+              {alarm.repeat === 'daily' ? 'Daily' : formatWhen(alarm.next_at)}
+              {alarm.label ? ` — ${alarm.label}` : ''}
+            </Meta>
+          </View>
+          <Pressable
+            onPress={async () => {
+              await cancelAlarm(alarm.id);
+              await refresh();
+            }}
+            hitSlop={10}
+            style={{ justifyContent: 'center' }}
+            accessibilityRole="button"
+            accessibilityLabel={`Delete ${formatClockTime(alarm.hour, alarm.minute)} alarm`}
+          >
+            <Meta style={{ color: t.ink }}>Delete</Meta>
+          </Pressable>
+        </Bento>
+      ))}
+
+      <Display style={{ fontSize: 28, marginTop: 12, marginBottom: 4, width: '100%' }}>
+        Reminders
+      </Display>
       {reminders.length === 0 && (
         <Bento span={2}>
           <Meta>Nothing pending</Meta>

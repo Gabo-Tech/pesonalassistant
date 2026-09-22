@@ -67,6 +67,30 @@ export function fallbackAsk(userText: string): AssistantReply {
     };
   }
 
+  const alarm = text.match(
+    /^(?:set (?:an? )?alarm|wake me(?: up)?)\s+(?:for\s+)?(.+)/i,
+  );
+  if (alarm) {
+    return {
+      say: 'Alarm is ready.',
+      action: { tool: 'create_alarm', when: alarm[1].trim() },
+    };
+  }
+
+  if (/\b(list alarms|what alarms|any alarms)\b/.test(lower)) {
+    return { say: 'Checking alarms.', action: { tool: 'list_alarms' } };
+  }
+
+  const cancelAlarm =
+    text.match(/^(?:cancel|delete|turn off)\s+(?:the\s+)?alarm(?:\s+(?:for|at)\s+)?(.+)/i) ??
+    text.match(/^(?:cancel|delete|turn off)\s+(?:the\s+)?(.+?)\s+alarms?$/i);
+  if (cancelAlarm) {
+    return {
+      say: 'Cancelled.',
+      action: { tool: 'cancel_alarm', text: cancelAlarm[1].trim() },
+    };
+  }
+
   const remind = lower.match(
     /^(?:remind me(?: to)?|set a reminder(?: to)?)\s+(.+)/i,
   );
@@ -133,7 +157,7 @@ export function fallbackAsk(userText: string): AssistantReply {
   }
 
   return {
-    say: 'No on-device model is loaded yet. Download one in Settings, or try: "note that …", "remind me to … tomorrow at 9", "WhatsApp Marie I\'m late", "tweet …".',
+    say: 'No on-device model is loaded yet. Download one in Settings, or try: "note that …", "set an alarm for 7am", "remind me to … tomorrow at 9", "WhatsApp Marie I\'m late", "tweet …".',
   };
 }
 

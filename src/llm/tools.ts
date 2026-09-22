@@ -18,6 +18,9 @@ export const TOOL_NAMES = [
   'create_reminder',
   'list_reminders',
   'complete_reminder',
+  'create_alarm',
+  'list_alarms',
+  'cancel_alarm',
   'remember_fact',
   'forget_fact',
   'draft_whatsapp',
@@ -91,6 +94,7 @@ export const SHARE_TOOLS: ReadonlySet<ToolName> = new Set([
 export const WRITE_TOOLS: ReadonlySet<ToolName> = new Set([
   'create_event',
   'create_reminder',
+  'create_alarm',
 ]);
 
 /**

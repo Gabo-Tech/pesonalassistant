@@ -6,7 +6,7 @@
  * "the model hallucinated a tweet" from ever becoming "the model published a tweet".
  */
 
-export type PendingKind = 'share' | 'calendar' | 'reminder';
+export type PendingKind = 'share' | 'calendar' | 'reminder' | 'alarm';
 
 export type Pending = {
   id: string;

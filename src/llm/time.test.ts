@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { parseWhen } from './time.ts';
+import { nextOccurrence, parseRepeat, parseWhen } from './time.ts';
 
 const noonMonday = Date.parse('2026-09-21T12:00:00');
 
@@ -23,5 +23,31 @@ describe('parseWhen', () => {
     const parsed = parseWhen('at 9am', noonMonday);
     assert.ok(parsed);
     assert.ok(parsed.at > noonMonday);
+  });
+});
+
+describe('parseRepeat', () => {
+  it('is once unless they say every day', () => {
+    assert.equal(parseRepeat('7am'), 'once');
+    assert.equal(parseRepeat('every day at 7'), 'daily');
+    assert.equal(parseRepeat('wake me daily at 7am'), 'daily');
+  });
+});
+
+describe('nextOccurrence', () => {
+  it('keeps a later time today', () => {
+    const at = nextOccurrence(15, 0, noonMonday);
+    const date = new Date(at);
+    assert.equal(date.getDate(), 21);
+    assert.equal(date.getHours(), 15);
+    assert.equal(date.getMinutes(), 0);
+  });
+
+  it('rolls a past 7am to tomorrow', () => {
+    const at = nextOccurrence(7, 0, noonMonday);
+    const date = new Date(at);
+    assert.equal(date.getDate(), 22);
+    assert.equal(date.getHours(), 7);
+    assert.equal(date.getMinutes(), 0);
   });
 });

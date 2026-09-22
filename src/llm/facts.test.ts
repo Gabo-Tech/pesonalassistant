@@ -31,5 +31,18 @@ describe('system prompt', () => {
     assert.match(src, /remember_fact/);
     assert.match(src, /forget_fact/);
     assert.match(src, /Lasting personal facts/);
+    assert.match(src, /create_alarm/);
+    assert.match(src, /list_alarms/);
+    assert.match(src, /cancel_alarm/);
+  });
+});
+
+describe('parseReply alarm tools', () => {
+  it('accepts create_alarm', () => {
+    const reply = parseReply(
+      '{"say": "Alarm set for 7am.", "action": {"tool": "create_alarm", "when": "7am"}}',
+    );
+    assert.equal(reply.action?.tool, 'create_alarm');
+    assert.equal(reply.action?.when, '7am');
   });
 });

@@ -136,3 +136,27 @@ export function formatWhen(ms: number): string {
     minute: '2-digit',
   });
 }
+
+export type AlarmRepeat = 'once' | 'daily';
+
+export const SNOOZE_MS = 10 * 60_000;
+
+/** Daily only when the user's own words say so. */
+export function parseRepeat(when: string): AlarmRepeat {
+  return /\b(every\s+day|everyday|daily)\b/i.test(when) ? 'daily' : 'once';
+}
+
+/** Next clock time at hour:minute, rolling to tomorrow if that instant has passed. */
+export function nextOccurrence(hour: number, minute: number, from = Date.now()): number {
+  const date = new Date(from);
+  date.setSeconds(0, 0);
+  date.setHours(hour, minute, 0, 0);
+  if (date.getTime() <= from) date.setDate(date.getDate() + 1);
+  return date.getTime();
+}
+
+export function formatClockTime(hour: number, minute: number): string {
+  const date = new Date();
+  date.setHours(hour, minute, 0, 0);
+  return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}

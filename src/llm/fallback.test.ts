@@ -38,6 +38,24 @@ describe('fallbackAsk', () => {
     assert.equal(reply.action?.when, 'tomorrow at 9');
   });
 
+  it('creates an alarm, not a reminder', () => {
+    const reply = fallbackAsk('set an alarm for 7am');
+    assert.equal(reply.action?.tool, 'create_alarm');
+    assert.match(reply.action?.when ?? '', /7am/i);
+  });
+
+  it('creates a daily alarm from wake me', () => {
+    const reply = fallbackAsk('wake me every day at 7am');
+    assert.equal(reply.action?.tool, 'create_alarm');
+    assert.match(reply.action?.when ?? '', /every day/i);
+  });
+
+  it('cancels an alarm by time', () => {
+    const reply = fallbackAsk('cancel the 7am alarm');
+    assert.equal(reply.action?.tool, 'cancel_alarm');
+    assert.match(reply.action?.text ?? '', /7am/i);
+  });
+
   it('drafts a whatsapp', () => {
     const reply = fallbackAsk("tell marie on whatsapp that I'm running late");
     assert.equal(reply.action?.tool, 'draft_whatsapp');
