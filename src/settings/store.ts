@@ -50,7 +50,7 @@ export const DEFAULT_SETTINGS: Settings = {
   speakReplies: true,
   voiceConfirm: true,
   confirmTimeoutMs: 20_000,
-  vadThreshold: 0.015,
+  vadThreshold: 0.01,
   llmModelPath: null,
   sttModelPath: null,
   calendarId: null,

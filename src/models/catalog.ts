@@ -1,5 +1,6 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import type { Locale } from '../i18n/wake';
+import { RECOMMENDED_LLM_ID } from './recommend';
 
 /**
  * Model files are far too big to ship inside the APK (the Metro bundler also caps
@@ -25,7 +26,7 @@ export const MODELS: ModelSpec[] = [
     id: 'qwen2.5-1.5b-q4',
     kind: 'llm',
     label: 'Qwen2.5 1.5B Instruct (Q4_K_M)',
-    note: 'Recommended. Good tool-calling for its size.',
+    note: 'Balanced tool-calling. Heavier than the recommended 0.5B.',
     bytes: 1_117_320_736,
     url: 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf',
     fileName: 'qwen2.5-1.5b-instruct-q4_k_m.gguf',
@@ -34,7 +35,7 @@ export const MODELS: ModelSpec[] = [
     id: 'qwen2.5-0.5b-q4',
     kind: 'llm',
     label: 'Qwen2.5 0.5B Instruct (Q4_K_M)',
-    note: 'Fastest, lowest RAM. Weaker at multi-step requests.',
+    note: 'Recommended. Fastest, lowest RAM. Weaker at multi-step requests.',
     bytes: 491_400_032,
     url: 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf',
     fileName: 'qwen2.5-0.5b-instruct-q4_k_m.gguf',
@@ -183,4 +184,11 @@ export function formatBytes(bytes: number): string {
 export function recommendedStt(locale: Locale): ModelSpec {
   const id = locale === 'es' ? 'whisper-tiny' : 'whisper-tiny-en';
   return MODELS.find((model) => model.id === id) ?? MODELS.find((model) => model.kind === 'stt')!;
+}
+
+export function recommendedLlm(): ModelSpec {
+  return (
+    MODELS.find((model) => model.id === RECOMMENDED_LLM_ID) ??
+    MODELS.find((model) => model.kind === 'llm')!
+  );
 }

@@ -15,6 +15,7 @@ import { useT } from '../../src/i18n';
 import { MarkdownView } from '../../src/notes/MarkdownView';
 import { inferNoteTitle } from '../../src/notes/title';
 import { GUTTER, PAGE_MARGIN } from '../../src/ui/Bento';
+import { KeyboardGutter } from '../../src/ui/KeyboardGutter';
 import { useTheme } from '../../src/ui/ThemeProvider';
 import { Meta } from '../../src/ui/Type';
 
@@ -78,6 +79,7 @@ export default function NoteEditorScreen() {
       style={{ flex: 1, backgroundColor: t.bg }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <KeyboardGutter>
       <View style={styles.bar}>
         <Pressable onPress={() => router.back()} hitSlop={10}>
           <Meta>{tr('common.back')}</Meta>
@@ -119,6 +121,7 @@ export default function NoteEditorScreen() {
           <Meta>{tr('common.delete')}</Meta>
         </Pressable>
       ) : null}
+      </KeyboardGutter>
     </KeyboardAvoidingView>
   );
 }

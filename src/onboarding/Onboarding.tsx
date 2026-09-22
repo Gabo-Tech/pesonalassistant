@@ -13,8 +13,8 @@ import {
   formatBytes,
   isDownloaded,
   localPath,
-  MODELS,
   recommendedStt,
+  recommendedLlm,
   type ModelSpec,
 } from '../models/catalog';
 import { prepareNotifications } from '../notify';
@@ -27,7 +27,7 @@ import { Body, Display, Meta } from '../ui/Type';
 import { loadStt } from '../voice/stt';
 import { useVoice } from '../voice/VoiceProvider';
 
-const RECOMMENDED_LLM = MODELS.find((m) => m.id === 'qwen2.5-1.5b-q4')!;
+const RECOMMENDED_LLM = recommendedLlm();
 
 /**
  * First launch only. Four steps, one job each. Skip is allowed: typed commands

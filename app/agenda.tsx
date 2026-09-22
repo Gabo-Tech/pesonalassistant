@@ -24,6 +24,7 @@ import { localeTag } from '../src/i18n/wake';
 import { formatClockTime, formatWhen, nextOccurrence, parseWhen } from '../src/llm/time';
 import { useSettings } from '../src/settings/store';
 import { Bento, Chip, GUTTER, InkSwitch, PAGE_MARGIN } from '../src/ui/Bento';
+import { KeyboardGutter } from '../src/ui/KeyboardGutter';
 import { useTheme } from '../src/ui/ThemeProvider';
 import { Body, Display, Meta } from '../src/ui/Type';
 
@@ -69,7 +70,7 @@ export default function AgendaScreen() {
 
   const saveAlarm = async () => {
     if (!alarmDraft) return;
-    const when = parseWhen(alarmDraft.time.includes('at') ? alarmDraft.time : `at ${alarmDraft.time}`);
+    const when = parseWhen(alarmDraft.time);
     if (!when) {
       setFormError(tr('agenda.invalidClock'));
       return;
@@ -144,6 +145,7 @@ export default function AgendaScreen() {
   };
 
   return (
+    <KeyboardGutter style={{ backgroundColor: t.bg }}>
     <ScrollView
       style={{ flex: 1, backgroundColor: t.bg }}
       contentContainerStyle={styles.content}
@@ -394,6 +396,7 @@ export default function AgendaScreen() {
         </Bento>
       ))}
     </ScrollView>
+    </KeyboardGutter>
   );
 }
 

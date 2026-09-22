@@ -17,6 +17,7 @@ import { useGate } from '../src/share/useGate';
 import { useSettings } from '../src/settings/store';
 import { Bento, BentoLabel, GUTTER, InkSwitch, PAGE_MARGIN } from '../src/ui/Bento';
 import { ConfirmCard } from '../src/ui/ConfirmCard';
+import { KeyboardGutter } from '../src/ui/KeyboardGutter';
 import { Orb } from '../src/ui/Orb';
 import { useTheme } from '../src/ui/ThemeProvider';
 import { Body, Meta } from '../src/ui/Type';
@@ -81,6 +82,7 @@ export default function HomeScreen() {
       style={{ flex: 1, backgroundColor: t.bg }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <KeyboardGutter>
       <View style={styles.page}>
         {alerts.length > 0 && (
           <Bento span={2} style={{ gap: 10 }}>
@@ -96,19 +98,14 @@ export default function HomeScreen() {
           </Bento>
         )}
 
-        <View style={styles.statusRow}>
-          <Bento span={1} style={styles.half}>
-            <BentoLabel>{tr('home.listen')}</BentoLabel>
-            <Body style={{ marginBottom: 10 }}>{tr('home.alwaysListen', { wake: settings.wakeWord })}</Body>
-            <InkSwitch value={listening} onValueChange={(on) => void toggleListening(on)} />
-          </Bento>
-          <Bento span={1} style={styles.half}>
-            <BentoLabel>{tr('home.model')}</BentoLabel>
-            <Body>{describeEngine(boot, tr)}</Body>
-          </Bento>
+        <View style={[styles.listenBar, { borderColor: t.line, backgroundColor: t.surface, borderRadius: t.radiusChip }]}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Meta>{tr('home.alwaysListen', { wake: settings.wakeWord })}</Meta>
+            <Meta style={{ textTransform: 'none', letterSpacing: 0 }}>{status}</Meta>
+          </View>
+          <InkSwitch value={listening} onValueChange={(on) => void toggleListening(on)} />
         </View>
-
-        <Meta>{status}</Meta>
+        <Meta style={{ textTransform: 'none', letterSpacing: 0 }}>{describeEngine(boot, tr)}</Meta>
 
         <FlatList
           ref={listRef}
@@ -137,11 +134,11 @@ export default function HomeScreen() {
           />
         )}
 
-        {(snapshot.error || boot.error) && snapshot.state !== 'off' ? (
+        {(snapshot.error || boot.error) && snapshot.state !== 'off' && snapshot.error !== status ? (
           <Meta>{snapshot.error ?? boot.error}</Meta>
         ) : null}
 
-        <Pressable onPress={() => void voiceSession.clearChat()} hitSlop={8}>
+        <Pressable onPress={() => void voiceSession.clearChat()} hitSlop={8} style={{ alignSelf: 'flex-start' }}>
           <Meta>{tr('home.clear')}</Meta>
         </Pressable>
 
@@ -173,6 +170,7 @@ export default function HomeScreen() {
           {tr('home.privacy')}
         </Meta>
       </View>
+      </KeyboardGutter>
     </KeyboardAvoidingView>
   );
 }
@@ -249,8 +247,14 @@ const styles = StyleSheet.create({
     gap: GUTTER,
     paddingBottom: 16,
   },
-  statusRow: { flexDirection: 'row', gap: GUTTER },
-  half: { flex: 1, justifyContent: 'space-between' },
+  listenBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
   thread: { gap: 10, paddingVertical: 8, flexGrow: 1, justifyContent: 'flex-end' },
   bubbleRow: { width: '100%', flexDirection: 'row' },
   bubble: { borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingVertical: 10 },

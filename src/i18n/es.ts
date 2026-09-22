@@ -51,6 +51,9 @@ export const es: { [K in keyof typeof en]: string } = {
   'stt.off': 'Toca el orbe para hablar',
   'stt.englishOnly':
     'Este modelo de voz es solo inglés. Descarga Whisper multilingüe en Ajustes para el español.',
+  'stt.cantHear':
+    'No te oigo. Acércate, o sube la sensibilidad del micrófono en Ajustes.',
+  'stt.missed': 'No te entendí. Prueba otra vez.',
 
   'voice.yes': '¿Sí?',
   'voice.cancelled': 'Cancelado.',
@@ -102,6 +105,10 @@ export const es: { [K in keyof typeof en]: string } = {
   'agenda.editReminder': 'Editar recordatorio',
   'agenda.editEvent': 'Editar evento',
   'agenda.daily': 'Diaria',
+  'alarm.title': 'Alarma',
+  'alarm.everyDay': 'Todos los días',
+  'alarm.dismiss': 'Descartar',
+  'alarm.snooze': 'Posponer 10 min',
   'agenda.once': 'Una vez',
   'agenda.label': 'Etiqueta',
   'agenda.time': 'Hora',
@@ -147,7 +154,10 @@ export const es: { [K in keyof typeof en]: string } = {
   'settings.voice': 'Voz',
   'settings.models': 'Modelos',
   'settings.modelsHint':
-    'Se descargan una vez y luego se usan sin red. Esta es la única vez que la app usa internet. Para español, descarga Whisper multilingüe.',
+    'Se descargan una vez; elige cuál se carga. Cambiar con Usar no usa red. Para español, carga Whisper multilingüe.',
+  'settings.use': 'Usar',
+  'settings.downloadRemaining': 'Descargar el resto',
+  'settings.downloadingRemaining': 'Descargando {name}',
   'settings.sending': 'Enviar mensajes',
   'settings.sendingHint':
     'WhatsApp, Signal y X no tienen una API privada para enviar como tú, así que tras confirmar, la app abre la app real con el borrador.',

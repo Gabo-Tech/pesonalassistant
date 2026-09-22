@@ -87,6 +87,7 @@ function ThemedTabs({ hideChrome }: { hideChrome: boolean }) {
               elevation: 0,
               shadowOpacity: 0,
             },
+        tabBarHideOnKeyboard: true,
         tabBarActiveTintColor: t.ink,
         tabBarInactiveTintColor: t.dim,
         tabBarLabelStyle: {

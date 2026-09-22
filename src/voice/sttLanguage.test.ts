@@ -8,8 +8,9 @@ describe('whisperLanguage', () => {
     assert.equal(isEnglishOnlyModel('/models/ggml-tiny.en-q5_1.bin'), true);
   });
 
-  it('uses Spanish on multilingual models', () => {
-    assert.equal(whisperLanguage('es', '/models/ggml-tiny-q5_1.bin'), 'es');
+  it('uses auto on multilingual models', () => {
+    assert.equal(whisperLanguage('es', '/models/ggml-tiny-q5_1.bin'), 'auto');
+    assert.equal(whisperLanguage('en', '/models/ggml-tiny-q5_1.bin'), 'auto');
     assert.equal(isEnglishOnlyModel('/models/ggml-tiny-q5_1.bin'), false);
   });
 });

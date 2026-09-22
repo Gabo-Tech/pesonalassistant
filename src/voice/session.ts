@@ -16,7 +16,9 @@ import { isSttReady, transcribe } from './stt';
 import { EnergyVad } from './vad';
 import { detectWake } from './wake';
 import {
+  CANT_HEAR_MS,
   CONVERSATION_IDLE_MS,
+  afterBlankSpeech,
   afterCommandResume,
   pushToTalkState,
   resumeAfterSpeech,
@@ -62,11 +64,13 @@ class VoiceSession {
   /** Bumped on stop / new command so in-flight STT, LLM, and TTS cannot revive the session. */
   private generation = 0;
   private conversationTimer: ReturnType<typeof setTimeout> | null = null;
+  private cantHearTimer: ReturnType<typeof setTimeout> | null = null;
 
   private readonly vad = new EnergyVad({
     onSpeechStart: () => {
       if (this.isDeaf()) return;
-      this.update({ hearingSpeech: true });
+      this.clearCantHear();
+      this.update({ hearingSpeech: true, error: null });
     },
     onUtterance: (samples) => {
       this.update({ hearingSpeech: false });
@@ -125,6 +129,7 @@ class VoiceSession {
     this.generation += 1;
     this.busy = false;
     this.clearConversationIdle();
+    this.clearCantHear();
     this.vad.reset();
     stopSpeaking();
     this.update({ state: 'off', hearingSpeech: false });
@@ -145,7 +150,10 @@ class VoiceSession {
       error: missing ? t('stt.missing') : null,
       heard: next === 'listening' ? '' : this.snapshot.heard,
     });
-    if (next === 'listening' && !missing) this.armConversationIdle();
+    if (next === 'listening' && !missing) {
+      this.armConversationIdle();
+      this.armCantHear();
+    }
   }
 
   pushAudio(samples: Float32Array, sampleRate: number): void {
@@ -171,7 +179,17 @@ class VoiceSession {
     try {
       const transcript = await transcribe(samples);
       if (shouldIgnoreAsync(gen, this.generation, this.snapshot.state)) return;
-      if (!transcript) return;
+      if (!transcript) {
+        const next = afterBlankSpeech(capturedState);
+        this.update({ state: next, error: t('stt.missed') });
+        if (next === 'listening') {
+          this.armConversationIdle();
+          this.armCantHear();
+        }
+        return;
+      }
+
+      this.update({ error: null });
 
       if (confirming || this.snapshot.state === 'confirming') {
         await this.handleConfirmSpeech(transcript);
@@ -283,7 +301,10 @@ class VoiceSession {
         requested: resume,
       });
       this.update({ state: next });
-      if (next === 'listening') this.armConversationIdle();
+      if (next === 'listening') {
+        this.armConversationIdle();
+        this.armCantHear();
+      }
     };
 
     if (!peekSettings().speakReplies) {
@@ -317,6 +338,21 @@ class VoiceSession {
     if (!this.conversationTimer) return;
     clearTimeout(this.conversationTimer);
     this.conversationTimer = null;
+  }
+
+  private armCantHear(): void {
+    this.clearCantHear();
+    this.cantHearTimer = setTimeout(() => {
+      if (this.snapshot.state === 'listening' && !this.snapshot.hearingSpeech) {
+        this.update({ error: t('stt.cantHear') });
+      }
+    }, CANT_HEAR_MS);
+  }
+
+  private clearCantHear(): void {
+    if (!this.cantHearTimer) return;
+    clearTimeout(this.cantHearTimer);
+    this.cantHearTimer = null;
   }
 }
 

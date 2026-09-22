@@ -1,5 +1,5 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { resolveModel } from '../src/boot';
@@ -22,6 +22,7 @@ import { isCrawlerAvailable, isCrawlerEnabled } from '../src/share/crawler';
 import { openAccessibilitySettings, openTtsSettings } from '../src/share/intents';
 import { useSettings } from '../src/settings/store';
 import { Bento, BentoLabel, Chip, GUTTER, InkSwitch, PAGE_MARGIN } from '../src/ui/Bento';
+import { KeyboardGutter } from '../src/ui/KeyboardGutter';
 import { useTheme } from '../src/ui/ThemeProvider';
 import { Body, Meta } from '../src/ui/Type';
 import { voiceSession } from '../src/voice/session';
@@ -30,8 +31,8 @@ import { listTtsVoices, speak } from '../src/voice/tts';
 import { formatVoiceLabel, type RankedVoice } from '../src/voice/voices';
 
 const SENSITIVITY = [
-  { labelKey: 'voice.quiet' as const, value: 0.008 },
-  { labelKey: 'voice.normal' as const, value: 0.015 },
+  { labelKey: 'voice.quiet' as const, value: 0.005 },
+  { labelKey: 'voice.normal' as const, value: 0.01 },
   { labelKey: 'voice.noisy' as const, value: 0.03 },
 ];
 
@@ -45,6 +46,9 @@ export default function SettingsScreen() {
   const [calendarDenied, setCalendarDenied] = useState(false);
   const [facts, setFacts] = useState<Fact[]>([]);
   const [voices, setVoices] = useState<RankedVoice[]>([]);
+  const [diskRev, setDiskRev] = useState(0);
+  const [bulkProgress, setBulkProgress] = useState<{ name: string; fraction: number } | null>(null);
+  const bulkCancel = useRef<(() => void) | null>(null);
 
   useEffect(() => subscribeEngine(setEngine), []);
 
@@ -94,7 +98,47 @@ export default function SettingsScreen() {
     [settings.wakeWord, updateSettings],
   );
 
+  const remaining = MODELS.filter((spec) => !isDownloaded(spec));
+  const remainingBytes = remaining.reduce((sum, spec) => sum + spec.bytes, 0);
+
+  const downloadRemaining = useCallback(async () => {
+    const queue = MODELS.filter((spec) => !isDownloaded(spec));
+    if (queue.length === 0) return;
+    const total = queue.reduce((sum, spec) => sum + spec.bytes, 0);
+    let offset = 0;
+    setBulkProgress({ name: queue[0].label, fraction: 0 });
+
+    try {
+      for (const spec of queue) {
+        if (isDownloaded(spec)) {
+          offset += spec.bytes;
+          continue;
+        }
+        setBulkProgress({ name: spec.label, fraction: offset / total });
+        const handle = downloadModel(spec, (fraction) => {
+          setBulkProgress({
+            name: spec.label,
+            fraction: (offset + spec.bytes * fraction) / total,
+          });
+        });
+        bulkCancel.current = handle.cancel;
+        await handle.promise;
+        bulkCancel.current = null;
+        offset += spec.bytes;
+        setDiskRev((value) => value + 1);
+      }
+    } catch {
+      bulkCancel.current = null;
+      setBulkProgress(null);
+      setDiskRev((value) => value + 1);
+      return;
+    }
+    setBulkProgress(null);
+    setDiskRev((value) => value + 1);
+  }, []);
+
   return (
+    <KeyboardGutter style={{ backgroundColor: t.bg }}>
     <ScrollView
       style={{ flex: 1, backgroundColor: t.bg }}
       contentContainerStyle={styles.content}
@@ -292,8 +336,32 @@ export default function SettingsScreen() {
 
       <Section title={tr('settings.models')}>
         <Body style={{ color: t.dim }}>{tr('settings.modelsHint')}</Body>
+        {remaining.length > 0 ? (
+          bulkProgress ? (
+            <>
+              <Meta>{tr('settings.downloadingRemaining', { name: bulkProgress.name })}</Meta>
+              <View style={[styles.progressTrack, { backgroundColor: t.line }]}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    { width: `${Math.round(bulkProgress.fraction * 100)}%`, backgroundColor: t.ink },
+                  ]}
+                />
+              </View>
+              <GhostButton
+                label={`${tr('common.cancel')} (${Math.round(bulkProgress.fraction * 100)}%)`}
+                onPress={() => bulkCancel.current?.()}
+              />
+            </>
+          ) : (
+            <InkButton
+              label={`${tr('settings.downloadRemaining')} (${formatBytes(remainingBytes)})`}
+              onPress={() => void downloadRemaining()}
+            />
+          )
+        ) : null}
         {MODELS.map((spec) => (
-          <ModelRow key={spec.id} spec={spec} engine={engine} />
+          <ModelRow key={spec.id} spec={spec} engine={engine} diskRev={diskRev} />
         ))}
       </Section>
 
@@ -320,10 +388,19 @@ export default function SettingsScreen() {
         <Body style={{ color: t.dim }}>{tr('settings.privacyHint')}</Body>
       </Section>
     </ScrollView>
+    </KeyboardGutter>
   );
 }
 
-function ModelRow({ spec, engine }: { spec: ModelSpec; engine: EngineStatus }) {
+function ModelRow({
+  spec,
+  engine,
+  diskRev,
+}: {
+  spec: ModelSpec;
+  engine: EngineStatus;
+  diskRev: number;
+}) {
   const t = useTheme();
   const tr = useT();
   const [present, setPresent] = useState(() => isDownloaded(spec));
@@ -331,6 +408,10 @@ function ModelRow({ spec, engine }: { spec: ModelSpec; engine: EngineStatus }) {
   const [error, setError] = useState<string | null>(null);
   const [cancelFn, setCancelFn] = useState<(() => void) | null>(null);
   const [, updateSettings] = useSettings();
+
+  useEffect(() => {
+    setPresent(isDownloaded(spec));
+  }, [diskRev, spec]);
 
   const inUse =
     spec.kind === 'llm'
@@ -404,6 +485,8 @@ function ModelRow({ spec, engine }: { spec: ModelSpec; engine: EngineStatus }) {
         ? { llmModelPath: fallback?.path ?? null }
         : { sttModelPath: fallback?.path ?? null },
     );
+    if (fallback && spec.kind === 'llm') await loadLlm(fallback.path);
+    if (fallback && spec.kind === 'stt') await loadStt(fallback.path);
   }, [inUse, spec, updateSettings]);
 
   return (
@@ -432,9 +515,16 @@ function ModelRow({ spec, engine }: { spec: ModelSpec; engine: EngineStatus }) {
       ) : present ? (
         <View style={styles.modelActions}>
           <Meta style={{ color: t.ink }}>{inUse ? tr('settings.loaded') : tr('settings.downloaded')}</Meta>
-          <Pressable onPress={() => void remove()} hitSlop={8}>
-            <Meta>{tr('common.delete')}</Meta>
-          </Pressable>
+          <View style={styles.chipRow}>
+            {!inUse && localPath(spec) ? (
+              <Pressable onPress={() => void activate(localPath(spec)!)} hitSlop={8}>
+                <Meta style={{ color: t.ink }}>{tr('settings.use')}</Meta>
+              </Pressable>
+            ) : null}
+            <Pressable onPress={() => void remove()} hitSlop={8}>
+              <Meta>{tr('common.delete')}</Meta>
+            </Pressable>
+          </View>
         </View>
       ) : (
         <>

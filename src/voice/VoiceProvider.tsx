@@ -10,6 +10,7 @@ import { startListenService, stopListenService } from '../native/listen';
 import { subscribeGate } from '../share/confirmGate';
 import { loadSettings, peekSettings } from '../settings/store';
 import { resampleTo16k } from './resample';
+import { decodePcm } from './pcm';
 import { WHISPER_SAMPLE_RATE } from './stt';
 import { voiceSession, type SessionSnapshot } from './session';
 
@@ -42,6 +43,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   /** User toggle wins over the async always-listen restore. */
   const listenIntent = useRef<'unset' | 'on' | 'off'>('unset');
   const startStreamRef = useRef<() => Promise<boolean>>(async () => false);
+  const lastListenState = useRef<SessionSnapshot['state'] | null>(null);
 
   useEffect(() => voiceSession.subscribe(setSnapshot), []);
 
@@ -58,8 +60,9 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     channels: 1,
     encoding: 'float32',
     onBuffer: (buffer) => {
-      const pcm = resampleTo16k(new Float32Array(buffer.data), buffer.sampleRate);
-      voiceSession.pushAudio(pcm, WHISPER_SAMPLE_RATE);
+      const pcm = decodePcm(buffer.data);
+      const resampled = resampleTo16k(pcm, buffer.sampleRate);
+      voiceSession.pushAudio(resampled, WHISPER_SAMPLE_RATE);
     },
   });
 
@@ -99,6 +102,25 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   }, [ensureMic, stream]);
 
   startStreamRef.current = startStream;
+
+  const remicForListen = useCallback(async () => {
+    await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+    if (wantStream.current) {
+      stream.stop();
+      wantStream.current = false;
+    }
+    await startStreamRef.current();
+  }, [stream]);
+
+  // TTS can steal the recording session. Re-arm the mic when we start listening again.
+  useEffect(() => {
+    const state = snapshot.state;
+    const entered =
+      (state === 'listening' || state === 'confirming') && lastListenState.current !== state;
+    lastListenState.current = state;
+    if (!entered) return;
+    void remicForListen();
+  }, [remicForListen, snapshot.state]);
 
   const setListening = useCallback(
     async (on: boolean) => {

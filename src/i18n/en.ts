@@ -49,6 +49,9 @@ export const en = {
   'stt.off': 'Tap the orb to talk',
   'stt.englishOnly':
     'This speech model is English-only. Download multilingual Whisper in Settings for Spanish.',
+  'stt.cantHear':
+    'I cannot hear you. Speak closer, or raise microphone sensitivity in Settings.',
+  'stt.missed': 'I did not catch that. Try again.',
 
   'voice.yes': 'Yes?',
   'voice.cancelled': 'Cancelled.',
@@ -100,6 +103,10 @@ export const en = {
   'agenda.editReminder': 'Edit reminder',
   'agenda.editEvent': 'Edit event',
   'agenda.daily': 'Daily',
+  'alarm.title': 'Alarm',
+  'alarm.everyDay': 'Every day',
+  'alarm.dismiss': 'Dismiss',
+  'alarm.snooze': 'Snooze 10 min',
   'agenda.once': 'Once',
   'agenda.label': 'Label',
   'agenda.time': 'Time',
@@ -145,7 +152,10 @@ export const en = {
   'settings.voice': 'Voice',
   'settings.models': 'Models',
   'settings.modelsHint':
-    'Downloaded once, then used entirely offline. This is the only time the app uses the network. For Spanish, download a multilingual Whisper model.',
+    'Download once, then pick which one is loaded. Switching with Use stays offline. For Spanish, load a multilingual Whisper model.',
+  'settings.use': 'Use',
+  'settings.downloadRemaining': 'Download remaining',
+  'settings.downloadingRemaining': 'Downloading {name}',
   'settings.sending': 'Sending messages',
   'settings.sendingHint':
     'WhatsApp, Signal and X have no private API for sending as you, so after you confirm, the app opens the real app with your draft.',

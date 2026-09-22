@@ -3,7 +3,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { deleteNote, listNotes, searchNotes, type Note } from '../../src/db/notes';
 import { useT } from '../../src/i18n';
+import { noteSnippet } from '../../src/notes/title';
 import { Bento, GUTTER, PAGE_MARGIN } from '../../src/ui/Bento';
+import { KeyboardGutter } from '../../src/ui/KeyboardGutter';
 import { useTheme } from '../../src/ui/ThemeProvider';
 import { Body, Display, Meta } from '../../src/ui/Type';
 
@@ -32,6 +34,7 @@ export default function NotesScreen() {
   }, [query, refresh]);
 
   return (
+    <KeyboardGutter style={{ backgroundColor: t.bg }}>
     <View style={{ flex: 1, backgroundColor: t.bg, padding: PAGE_MARGIN, gap: GUTTER }}>
       <Bento span={2} style={styles.toolbar}>
         <TextInput
@@ -63,9 +66,9 @@ export default function NotesScreen() {
                 <Display style={{ fontSize: 22, lineHeight: 28 }}>
                   {item.title.trim() || item.body.split('\n')[0]?.slice(0, 80) || tr('notes.untitled')}
                 </Display>
-                {item.body ? (
+                {noteSnippet(item.body) ? (
                   <Body style={{ color: t.dim }} numberOfLines={3}>
-                    {item.body}
+                    {noteSnippet(item.body)}
                   </Body>
                 ) : null}
                 <Body style={{ color: t.dim, fontSize: 11, lineHeight: 16 }}>
@@ -94,6 +97,7 @@ export default function NotesScreen() {
         )}
       />
     </View>
+    </KeyboardGutter>
   );
 }
 

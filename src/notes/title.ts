@@ -1,3 +1,12 @@
+/** One plain line for the notes list. Headings and emphasis stay out of the snippet. */
+export function noteSnippet(markdown: string): string {
+  const line = markdown
+    .split('\n')
+    .map((part) => stripInline(part))
+    .find((part) => part.length > 0);
+  return line ? clip(line) : '';
+}
+
 export function inferNoteTitle(markdown: string, explicit?: string): string {
   const given = explicit?.trim();
   if (given) return clip(given);

@@ -6,7 +6,7 @@ export function isEnglishOnlyModel(path: string | null | undefined): boolean {
   return /tiny\.en|base\.en|small\.en|\.en-q|\.en\.bin/i.test(path);
 }
 
-export function whisperLanguage(locale: Locale, modelPath: string | null | undefined): string {
+export function whisperLanguage(_locale: Locale, modelPath: string | null | undefined): string {
   if (isEnglishOnlyModel(modelPath)) return 'en';
-  return locale === 'es' ? 'es' : 'en';
+  return 'auto';
 }

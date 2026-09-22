@@ -31,6 +31,16 @@ describe('parseWhen', () => {
     assert.equal(date.getHours(), 9);
   });
 
+  it('parses a bare clock and Spanish a las without the word at', () => {
+    const clock = parseWhen('7:30', noonMonday);
+    assert.ok(clock);
+    assert.equal(new Date(clock.at).getMinutes(), 30);
+
+    const spanish = parseWhen('a las 7', noonMonday);
+    assert.ok(spanish);
+    assert.equal(new Date(spanish.at).getMinutes(), 0);
+  });
+
   it('rolls a past clock time to tomorrow', () => {
     const parsed = parseWhen('at 9am', noonMonday);
     assert.ok(parsed);

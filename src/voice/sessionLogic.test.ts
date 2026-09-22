@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   afterCommandResume,
+  afterBlankSpeech,
   pushToTalkState,
   resumeAfterSpeech,
   shouldIgnoreAsync,
@@ -41,6 +42,14 @@ describe('pushToTalkState', () => {
   it('does not leave confirming', () => {
     assert.equal(pushToTalkState(true), 'confirming');
     assert.equal(pushToTalkState(false), 'listening');
+  });
+});
+
+describe('afterBlankSpeech', () => {
+  it('stays listening so the next try does not need the wake word', () => {
+    assert.equal(afterBlankSpeech('listening'), 'listening');
+    assert.equal(afterBlankSpeech('idle'), 'idle');
+    assert.equal(afterBlankSpeech('confirming'), 'confirming');
   });
 });
 

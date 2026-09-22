@@ -14,6 +14,9 @@ export type SessionState =
 /** After a spoken reply, stay in conversation mode until this silence window. */
 export const CONVERSATION_IDLE_MS = 45_000;
 
+/** Listening with no VAD hit — surface "I can't hear you" instead of a silent orb. */
+export const CANT_HEAR_MS = 2_500;
+
 export function resumeAfterSpeech(opts: {
   sessionOff: boolean;
   gatePending: boolean;
@@ -33,6 +36,13 @@ export function afterCommandResume(awaitingConfirm: boolean): SessionState {
 /** PTT must not yank the user out of a pending confirm. */
 export function pushToTalkState(gatePending: boolean): SessionState {
   return gatePending ? 'confirming' : 'listening';
+}
+
+/** Blank Whisper output must not leave the user stuck with no status. */
+export function afterBlankSpeech(state: SessionState): SessionState {
+  if (state === 'confirming') return 'confirming';
+  if (state === 'listening') return 'listening';
+  return state === 'off' ? 'off' : 'idle';
 }
 
 export function shouldIgnoreAsync(

@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useT } from '../i18n';
 import { formatClockTime } from '../llm/time';
 import { handleAlarmDismiss, handleAlarmSnooze, type RingingAlarm } from '../notify/alarmRing';
 import { useTheme } from './ThemeProvider';
@@ -7,23 +8,24 @@ import { Body, Display, Meta } from './Type';
 
 export function AlarmOverlay({ alarm }: { alarm: RingingAlarm }) {
   const t = useTheme();
+  const tr = useT();
   const clock = formatClockTime(alarm.hour, alarm.minute);
 
   return (
     <SafeAreaView style={[styles.wrap, { backgroundColor: t.bg }]}>
-      <Meta>Alarm</Meta>
+      <Meta>{tr('alarm.title')}</Meta>
       <Display style={{ fontSize: 56, lineHeight: 64, marginTop: 12 }}>{clock}</Display>
       {alarm.label ? (
         <Body style={{ color: t.dim, marginTop: 8 }}>{alarm.label}</Body>
       ) : alarm.repeat === 'daily' ? (
-        <Body style={{ color: t.dim, marginTop: 8 }}>Every day</Body>
+        <Body style={{ color: t.dim, marginTop: 8 }}>{tr('alarm.everyDay')}</Body>
       ) : null}
 
       <View style={styles.row}>
         <Pressable
           onPress={() => void handleAlarmDismiss()}
           accessibilityRole="button"
-          accessibilityLabel="Dismiss alarm"
+          accessibilityLabel={tr('alarm.dismiss')}
           style={[
             styles.button,
             {
@@ -33,18 +35,18 @@ export function AlarmOverlay({ alarm }: { alarm: RingingAlarm }) {
             },
           ]}
         >
-          <Meta>Dismiss</Meta>
+          <Meta>{tr('alarm.dismiss')}</Meta>
         </Pressable>
         <Pressable
           onPress={() => void handleAlarmSnooze()}
           accessibilityRole="button"
-          accessibilityLabel="Snooze 10 minutes"
+          accessibilityLabel={tr('alarm.snooze')}
           style={[
             styles.button,
             { borderRadius: t.radiusChip, backgroundColor: t.inverse },
           ]}
         >
-          <Meta style={{ color: t.inverseInk }}>Snooze 10 min</Meta>
+          <Meta style={{ color: t.inverseInk }}>{tr('alarm.snooze')}</Meta>
         </Pressable>
       </View>
     </SafeAreaView>

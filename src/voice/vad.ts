@@ -9,6 +9,8 @@
  * it costs no extra download, no extra RAM, and is easy to reason about.
  */
 
+import { peakNormalize } from './pcm';
+
 export type VadConfig = {
   /** RMS above this counts as speech. Raise it in noisy rooms. */
   threshold: number;
@@ -23,7 +25,7 @@ export type VadConfig = {
 };
 
 export const DEFAULT_VAD: VadConfig = {
-  threshold: 0.015,
+  threshold: 0.01,
   hangoverMs: 700,
   minSpeechMs: 250,
   maxUtteranceMs: 12_000,
@@ -121,7 +123,7 @@ export class EnergyVad {
     this.reset();
 
     if (!hadEnoughSpeech || chunks.length === 0) return;
-    this.events.onUtterance(concat(chunks), rate);
+    this.events.onUtterance(peakNormalize(concat(chunks)), rate);
   }
 
   get isCollecting(): boolean {
