@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native
 import * as DocumentPicker from 'expo-document-picker';
 import { resolveModel } from '../src/boot';
 import { writableCalendars, ensureCalendarPermission, hasCalendarPermission } from '../src/calendar/events';
+import { deleteFact, listFacts, type Fact } from '../src/db/facts';
 import { loadLlm, subscribeEngine, unloadLlm, type EngineStatus } from '../src/llm/engine';
 import {
   MODELS,
@@ -37,6 +38,7 @@ export default function SettingsScreen() {
   const [crawlerOn, setCrawlerOn] = useState(false);
   const [calendars, setCalendars] = useState<{ id: string; title: string }[]>([]);
   const [calendarDenied, setCalendarDenied] = useState(false);
+  const [facts, setFacts] = useState<Fact[]>([]);
 
   useEffect(() => subscribeEngine(setEngine), []);
 
@@ -53,11 +55,16 @@ export default function SettingsScreen() {
     setCalendars(list.map((calendar) => ({ id: calendar.id, title: calendar.title ?? calendar.id })));
   }, []);
 
+  const loadFacts = useCallback(async () => {
+    setFacts(await listFacts());
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       void loadCalendars();
+      void loadFacts();
       setCrawlerOn(isCrawlerEnabled());
-    }, [loadCalendars]),
+    }, [loadCalendars, loadFacts]),
   );
 
   const setSensitivity = useCallback(
@@ -135,6 +142,41 @@ export default function SettingsScreen() {
         )}
       </Section>
 
+      <Section title="Memory">
+        <Body style={{ color: t.dim }}>
+          Lasting facts the assistant recalls on every request. Say “I’m Gabriel, I’m 29”, or delete
+          a row here. Notes live on the Notes tab; this is only identity and preferences.
+        </Body>
+        {facts.length === 0 ? (
+          <Body style={{ color: t.dim }}>No facts stored yet.</Body>
+        ) : (
+          facts.map((fact) => (
+            <View
+              key={fact.id}
+              style={[styles.factRow, { borderColor: t.line, borderRadius: t.radiusChip }]}
+            >
+              <View style={{ flex: 1, gap: 4 }}>
+                <Meta>{fact.title}</Meta>
+                <Body>{fact.text}</Body>
+              </View>
+              <Pressable
+                onPress={() => {
+                  void (async () => {
+                    await deleteFact(fact.id);
+                    await loadFacts();
+                  })();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Delete ${fact.title}`}
+                style={{ paddingVertical: 8, paddingHorizontal: 4 }}
+              >
+                <Meta>Delete</Meta>
+              </Pressable>
+            </View>
+          ))
+        )}
+      </Section>
+
       <Section title="Voice">
         <Toggle
           label="Speak replies out loud"
@@ -200,8 +242,8 @@ export default function SettingsScreen() {
 
       <Section title="Privacy">
         <Body style={{ color: t.dim }}>
-          Speech recognition and the language model run on this device. Notes and reminders are
-          stored in a local database. Nothing is uploaded.
+          Speech recognition and the language model run on this device. Notes, reminders, and
+          remembered facts are stored in a local database. Nothing is uploaded.
         </Body>
       </Section>
     </ScrollView>
@@ -402,6 +444,13 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  factRow: {
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
   input: {
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 12,

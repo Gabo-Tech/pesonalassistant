@@ -1,4 +1,5 @@
 import { createEvent, listEvents } from '../calendar/events';
+import { deleteFactByTitle, listFacts, upsertFact } from '../db/facts';
 import { appendToNote, createNote, searchNotes } from '../db/notes';
 import { completeReminder, createReminder, listReminders } from '../db/reminders';
 import { requestConfirm } from '../share/confirmGate';
@@ -6,6 +7,7 @@ import { armSend } from '../share/crawler';
 import { openDraft, TARGETS, type ShareTarget } from '../share/intents';
 import { peekSettings } from '../settings/store';
 import { findUniqueMatch } from './match';
+import { forgetFactQuery, pickFactToForget, rememberFactInput } from '../db/factsFormat';
 import { formatWhen, parseWhen } from './time';
 import type { Action } from './tools';
 
@@ -155,6 +157,24 @@ export async function routeAction(action: Action, fallbackSay: string): Promise<
           .map((e) => `${e.title} at ${formatWhen(e.start)}`)
           .join('; ')}.`,
       );
+    }
+
+    /* ---------------- facts: local and reversible, so no confirm ---------------- */
+    case 'remember_fact': {
+      const input = rememberFactInput(action);
+      if (!input) return ok('What should I remember?');
+      await upsertFact(input.title, input.text);
+      return ok('I will remember that.');
+    }
+
+    case 'forget_fact': {
+      const query = forgetFactQuery(action);
+      if (!query) return ok('Which fact should I forget?');
+      const facts = await listFacts();
+      const match = pickFactToForget(facts, query);
+      if (!match) return ok('I could not tell which fact you mean.');
+      await deleteFactByTitle(match.title);
+      return ok(`Forgotten ${match.title}.`);
     }
 
     /* ---------------- messaging: always confirmed, never auto-sent ---------------- */

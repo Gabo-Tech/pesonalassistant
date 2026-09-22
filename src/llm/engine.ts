@@ -1,4 +1,5 @@
 import { initLlama, type LlamaContext } from 'llama.rn';
+import { listFacts } from '../db/facts';
 import { recentTurns } from '../db/turns';
 import { fallbackAsk } from './fallback';
 import { buildSystemPrompt } from './prompt';
@@ -97,10 +98,10 @@ export async function unloadLlm(): Promise<void> {
 export async function ask(userText: string): Promise<AssistantReply> {
   if (!context) return fallbackAsk(userText);
 
-  const history = await recentTurns(6);
+  const [history, facts] = await Promise.all([recentTurns(6), listFacts()]);
 
   const messages = [
-    { role: 'system', content: buildSystemPrompt() },
+    { role: 'system', content: buildSystemPrompt(Date.now(), facts) },
     ...history
       .filter((turn) => turn.role !== 'system')
       .map((turn) => ({ role: turn.role, content: turn.text })),

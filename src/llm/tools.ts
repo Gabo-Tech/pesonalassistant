@@ -18,6 +18,8 @@ export const TOOL_NAMES = [
   'create_reminder',
   'list_reminders',
   'complete_reminder',
+  'remember_fact',
+  'forget_fact',
   'draft_whatsapp',
   'draft_signal',
   'draft_tweet',

@@ -12,6 +12,52 @@ export function fallbackAsk(userText: string): AssistantReply {
   const text = userText.trim();
   const lower = text.toLowerCase();
 
+  const packed = text.match(
+    /^i(?:'m| am)\s+(.+?)\s+and\s+i(?:'m| am)\s+(\d+)(?:\s+years?\s+old)?\.?$/i,
+  );
+  if (packed) {
+    return {
+      say: "I'll remember that.",
+      action: {
+        tool: 'remember_fact',
+        title: 'identity',
+        text: `Name ${packed[1].trim()}, age ${packed[2]}`,
+      },
+    };
+  }
+
+  const named = text.match(/^my name is\s+(.+)/i);
+  if (named) {
+    return {
+      say: "I'll remember that.",
+      action: { tool: 'remember_fact', title: 'identity', text: `Name ${named[1].trim()}` },
+    };
+  }
+
+  const aged = text.match(/^i(?:'m| am)\s+(\d+)(?:\s+years?\s+old)\.?$/i);
+  if (aged) {
+    return {
+      say: "I'll remember that.",
+      action: { tool: 'remember_fact', title: 'identity', text: `Age ${aged[1]}` },
+    };
+  }
+
+  const rememberMe = text.match(/^(?:remember(?: that)?)\s+(i(?:'m| am)\s+.+)/i);
+  if (rememberMe) {
+    return {
+      say: "I'll remember that.",
+      action: { tool: 'remember_fact', title: 'identity', text: rememberMe[1].trim() },
+    };
+  }
+
+  const forget = text.match(/^(?:forget|stop remembering)\s+(?:my\s+)?(.+)/i);
+  if (forget) {
+    return {
+      say: 'Forgotten.',
+      action: { tool: 'forget_fact', title: forget[1].trim() },
+    };
+  }
+
   const note = lower.match(/^(?:note that|make a note|remember that)\s+(.+)/i);
   if (note) {
     const body = text.slice(text.length - note[1].length);

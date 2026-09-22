@@ -3,7 +3,30 @@ import { describe, it } from 'node:test';
 import { fallbackAsk } from './fallback.ts';
 
 describe('fallbackAsk', () => {
-  it('creates a note', () => {
+  it('remembers packed identity facts', () => {
+    const reply = fallbackAsk("I'm Gabriel and I'm 29");
+    assert.equal(reply.action?.tool, 'remember_fact');
+    assert.equal(reply.action?.title, 'identity');
+    assert.match(reply.action?.text ?? '', /Gabriel/);
+    assert.match(reply.action?.text ?? '', /29/);
+  });
+
+  it('remembers "remember that I\'m …"', () => {
+    const reply = fallbackAsk("remember that I'm Gabriel");
+    assert.equal(reply.action?.tool, 'remember_fact');
+    assert.match(reply.action?.text ?? '', /Gabriel/);
+  });
+
+  it('forgets a fact by title', () => {
+    const reply = fallbackAsk('forget my age');
+    assert.equal(reply.action?.tool, 'forget_fact');
+    assert.equal(reply.action?.title, 'age');
+  });
+
+  it('still notes wifi passwords', () => {
+    const remember = fallbackAsk('remember that the wifi password is hunter2');
+    assert.equal(remember.action?.tool, 'create_note');
+
     const reply = fallbackAsk('note that the wifi password is hunter2');
     assert.equal(reply.action?.tool, 'create_note');
     assert.match(reply.action?.text ?? '', /hunter2/);
