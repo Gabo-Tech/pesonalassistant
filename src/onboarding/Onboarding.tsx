@@ -14,18 +14,20 @@ import {
   isDownloaded,
   localPath,
   MODELS,
+  recommendedStt,
+  type ModelSpec,
 } from '../models/catalog';
 import { prepareNotifications } from '../notify';
 import { useSettings } from '../settings/store';
-import { Bento, BentoLabel, GUTTER, InkSwitch, PAGE_MARGIN } from '../ui/Bento';
+import { useT } from '../i18n';
+import { localeWakeWord } from '../i18n/wake';
+import { Bento, BentoLabel, Chip, GUTTER, InkSwitch, PAGE_MARGIN } from '../ui/Bento';
 import { useTheme } from '../ui/ThemeProvider';
 import { Body, Display, Meta } from '../ui/Type';
 import { loadStt } from '../voice/stt';
 import { useVoice } from '../voice/VoiceProvider';
 
-const RECOMMENDED_STT = MODELS.find((m) => m.id === 'whisper-tiny-en')!;
 const RECOMMENDED_LLM = MODELS.find((m) => m.id === 'qwen2.5-1.5b-q4')!;
-const PAIR_BYTES = RECOMMENDED_STT.bytes + RECOMMENDED_LLM.bytes;
 
 /**
  * First launch only. Four steps, one job each. Skip is allowed: typed commands
@@ -33,6 +35,7 @@ const PAIR_BYTES = RECOMMENDED_STT.bytes + RECOMMENDED_LLM.bytes;
  */
 export function Onboarding() {
   const t = useTheme();
+  const tr = useT();
   const [settings, updateSettings] = useSettings();
   const { refreshMic, setListening } = useVoice();
   const [step, setStep] = useState(0);
@@ -67,19 +70,21 @@ export function Onboarding() {
   }, [refreshMic]);
 
   const saveWake = useCallback(async () => {
-    const word = wakeWord.trim() || 'computer';
+    const word = wakeWord.trim() || localeWakeWord(settings.locale, '');
     setWakeWord(word);
     await updateSettings({ wakeWord: word, alwaysListening: alwaysListen });
     if (alwaysListen) await prepareNotifications();
     setStep(3);
-  }, [alwaysListen, updateSettings, wakeWord]);
+  }, [alwaysListen, settings.locale, updateSettings, wakeWord]);
 
   const downloadRecommended = useCallback(async () => {
     setError(null);
     setBusy(true);
     setProgress(0);
+    const sttSpec = recommendedStt(settings.locale);
+    const pairBytes = sttSpec.bytes + RECOMMENDED_LLM.bytes;
 
-    const run = async (spec: typeof RECOMMENDED_STT, offset: number, weight: number) => {
+    const run = async (spec: ModelSpec, offset: number, weight: number) => {
       if (isDownloaded(spec)) {
         setProgress(offset + weight);
         return localPath(spec)!;
@@ -95,88 +100,105 @@ export function Onboarding() {
     };
 
     try {
-      setPhase('Speech');
-      const sttUri = await run(
-        RECOMMENDED_STT,
-        0,
-        RECOMMENDED_STT.bytes / PAIR_BYTES,
-      );
+      setPhase(tr('onboarding.speech'));
+      const sttUri = await run(sttSpec, 0, sttSpec.bytes / pairBytes);
       await loadStt(sttUri);
       await updateSettings({ sttModelPath: sttUri });
 
-      setPhase('Language model');
+      setPhase(tr('onboarding.llm'));
       const llmUri = await run(
         RECOMMENDED_LLM,
-        RECOMMENDED_STT.bytes / PAIR_BYTES,
-        RECOMMENDED_LLM.bytes / PAIR_BYTES,
+        sttSpec.bytes / pairBytes,
+        RECOMMENDED_LLM.bytes / pairBytes,
       );
       await loadLlm(llmUri);
       await updateSettings({ llmModelPath: llmUri });
 
       setProgress(1);
-      await finish({ wakeWord: wakeWord.trim() || 'computer', alwaysListening: alwaysListen });
+      await finish({
+        wakeWord: wakeWord.trim() || localeWakeWord(settings.locale, ''),
+        alwaysListening: alwaysListen,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setBusy(false);
       setPhase(null);
     }
-  }, [alwaysListen, finish, updateSettings, wakeWord]);
+  }, [alwaysListen, finish, settings.locale, tr, updateSettings, wakeWord]);
 
   const skip = useCallback(async () => {
     cancelRef.current?.();
-    await finish({ wakeWord: wakeWord.trim() || 'computer', alwaysListening: alwaysListen });
-  }, [alwaysListen, finish, wakeWord]);
+    await finish({
+      wakeWord: wakeWord.trim() || localeWakeWord(settings.locale, ''),
+      alwaysListening: alwaysListen,
+    });
+  }, [alwaysListen, finish, settings.locale, wakeWord]);
+
+  const sttSpec = recommendedStt(settings.locale);
+  const pairBytes = sttSpec.bytes + RECOMMENDED_LLM.bytes;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: t.bg }]}>
       <View style={styles.page}>
-        <Meta>
-          {step + 1} of 4
-        </Meta>
+        <Meta>{tr('onboarding.step', { n: step + 1 })}</Meta>
 
         {step === 0 && (
           <Bento span={2} style={styles.card}>
-            <BentoLabel>Welcome</BentoLabel>
-            <Display>Private by default</Display>
-            <Body style={{ color: t.dim, marginTop: 12 }}>
-              Speech and reasoning run on this phone. Messages to WhatsApp, Signal,
-              or X only go out after you confirm.
-            </Body>
+            <BentoLabel>{tr('onboarding.welcome')}</BentoLabel>
+            <Display>{tr('onboarding.welcomeTitle')}</Display>
+            <Body style={{ color: t.dim, marginTop: 12 }}>{tr('onboarding.welcomeBody')}</Body>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
+              <Chip
+                label={tr('settings.english')}
+                active={settings.locale === 'en'}
+                onPress={() => {
+                  void updateSettings({
+                    locale: 'en',
+                    wakeWord: localeWakeWord('en', wakeWord),
+                  });
+                  setWakeWord((word) => localeWakeWord('en', word));
+                }}
+              />
+              <Chip
+                label={tr('settings.spanish')}
+                active={settings.locale === 'es'}
+                onPress={() => {
+                  void updateSettings({
+                    locale: 'es',
+                    wakeWord: localeWakeWord('es', wakeWord),
+                  });
+                  setWakeWord((word) => localeWakeWord('es', word));
+                }}
+              />
+            </View>
           </Bento>
         )}
 
         {step === 1 && (
           <Bento span={2} style={styles.card}>
-            <BentoLabel>Voice</BentoLabel>
-            <Display>Microphone</Display>
-            <Body style={{ color: t.dim, marginTop: 12 }}>
-              Needed to hear you. You can still type if you skip this.
-            </Body>
+            <BentoLabel>{tr('onboarding.voice')}</BentoLabel>
+            <Display>{tr('onboarding.micTitle')}</Display>
+            <Body style={{ color: t.dim, marginTop: 12 }}>{tr('onboarding.micBody')}</Body>
             {micState === 'granted' && (
-              <Body style={{ marginTop: 16 }}>Microphone is on.</Body>
+              <Body style={{ marginTop: 16 }}>{tr('onboarding.micOn')}</Body>
             )}
             {micState === 'denied' && (
-              <Body style={{ marginTop: 16, color: t.dim }}>
-                Voice is off. You can type, and you can allow the microphone later
-                in system settings.
-              </Body>
+              <Body style={{ marginTop: 16, color: t.dim }}>{tr('onboarding.micDenied')}</Body>
             )}
           </Bento>
         )}
 
         {step === 2 && (
           <Bento span={2} style={styles.card}>
-            <BentoLabel>Wake</BentoLabel>
-            <Display>Your wake word</Display>
-            <Body style={{ color: t.dim, marginTop: 12 }}>
-              Spoken to start a request. Two or three syllables work best.
-            </Body>
+            <BentoLabel>{tr('onboarding.wake')}</BentoLabel>
+            <Display>{tr('onboarding.wakeTitle')}</Display>
+            <Body style={{ color: t.dim, marginTop: 12 }}>{tr('onboarding.wakeBody')}</Body>
             <TextInput
               value={wakeWord}
               onChangeText={setWakeWord}
               autoCapitalize="none"
               autoCorrect={false}
-              placeholder="computer"
+              placeholder={localeWakeWord(settings.locale, '')}
               placeholderTextColor={t.dim}
               style={[
                 styles.input,
@@ -188,7 +210,7 @@ export function Onboarding() {
               ]}
             />
             <View style={styles.toggleRow}>
-              <Body style={{ flex: 1 }}>Always listen for the wake word</Body>
+              <Body style={{ flex: 1 }}>{tr('onboarding.alwaysListen')}</Body>
               <InkSwitch
                 value={alwaysListen}
                 onValueChange={(on) => {
@@ -197,30 +219,25 @@ export function Onboarding() {
                 }}
               />
             </View>
-            <Body style={{ color: t.dim }}>
-              Always-listen needs a persistent notification so Android will keep
-              the microphone on.
-            </Body>
+            <Body style={{ color: t.dim }}>{tr('onboarding.alwaysHint')}</Body>
           </Bento>
         )}
 
         {step === 3 && (
           <Bento span={2} style={styles.card}>
-            <BentoLabel>Models</BentoLabel>
-            <Display>Voice on this phone</Display>
+            <BentoLabel>{tr('onboarding.models')}</BentoLabel>
+            <Display>{tr('onboarding.modelsTitle')}</Display>
             <Body style={{ color: t.dim, marginTop: 12 }}>
-              Download speech and the language model once ({formatBytes(PAIR_BYTES)}).
-              This is the only time the app uses the network. Typed commands work
-              if you skip.
+              {tr('onboarding.modelsBody', { size: formatBytes(pairBytes) })}
             </Body>
             <Body style={{ marginTop: 12 }}>
-              {RECOMMENDED_STT.label}
+              {sttSpec.label}
               {'\n'}
               {RECOMMENDED_LLM.label}
             </Body>
             {busy && (
               <View style={{ gap: 8, marginTop: 16 }}>
-                <Meta>{phase ?? 'Downloading'}</Meta>
+                <Meta>{phase ?? tr('settings.download')}</Meta>
                 <View style={[styles.track, { backgroundColor: t.line }]}>
                   <View
                     style={[
@@ -238,27 +255,27 @@ export function Onboarding() {
 
         <View style={styles.actions}>
           {step === 0 && (
-            <InkButton label="Continue" onPress={() => setStep(1)} />
+            <InkButton label={tr('onboarding.continue')} onPress={() => setStep(1)} />
           )}
 
           {step === 1 && (
             <>
               {micState !== 'granted' && (
-                <InkButton label="Allow microphone" onPress={() => void askMic()} />
+                <InkButton label={tr('onboarding.allowMic')} onPress={() => void askMic()} />
               )}
               {micState === 'granted' ? (
-                <InkButton label="Continue" onPress={() => setStep(2)} />
+                <InkButton label={tr('onboarding.continue')} onPress={() => setStep(2)} />
               ) : (
-                <GhostButton label="Continue without voice" onPress={() => setStep(2)} />
+                <GhostButton label={tr('onboarding.skipMic')} onPress={() => setStep(2)} />
               )}
-              <GhostButton label="Back" onPress={() => setStep(0)} />
+              <GhostButton label={tr('onboarding.back')} onPress={() => setStep(0)} />
             </>
           )}
 
           {step === 2 && (
             <>
-              <InkButton label="Continue" onPress={() => void saveWake()} />
-              <GhostButton label="Back" onPress={() => setStep(1)} />
+              <InkButton label={tr('onboarding.continue')} onPress={() => void saveWake()} />
+              <GhostButton label={tr('onboarding.back')} onPress={() => setStep(1)} />
             </>
           )}
 
@@ -266,12 +283,12 @@ export function Onboarding() {
             <>
               {!busy && (
                 <InkButton
-                  label="Download"
+                  label={tr('onboarding.download')}
                   onPress={() => void downloadRecommended()}
                 />
               )}
-              <GhostButton label="Skip for now" onPress={() => void skip()} />
-              {!busy && <GhostButton label="Back" onPress={() => setStep(2)} />}
+              <GhostButton label={tr('onboarding.skip')} onPress={() => void skip()} />
+              {!busy && <GhostButton label={tr('onboarding.back')} onPress={() => setStep(2)} />}
             </>
           )}
         </View>

@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useState } from 'react';
+import type { Locale } from '../i18n/wake';
 import type { Appearance } from '../ui/theme';
 
+export type { Locale };
 export type WakeEngine = 'off' | 'whisper' | 'porcupine';
 
 export type Settings = {
@@ -30,6 +32,13 @@ export type Settings = {
   appearance: Appearance;
   /** First-launch pager has been finished or skipped to Home. */
   onboardingComplete: boolean;
+  /** Interface, Whisper, and TTS language. */
+  locale: Locale;
+  /** Android TTS voice identifier from Speech.getAvailableVoicesAsync. */
+  ttsVoiceId: string | null;
+  /** 1.0 is the system default. */
+  ttsRate: number;
+  ttsPitch: number;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -48,6 +57,10 @@ export const DEFAULT_SETTINGS: Settings = {
   sendCrawlerEnabled: false,
   appearance: 'dark',
   onboardingComplete: false,
+  locale: 'en',
+  ttsVoiceId: null,
+  ttsRate: 1,
+  ttsPitch: 1,
 };
 
 const STORAGE_KEY = 'assistant.settings.v1';

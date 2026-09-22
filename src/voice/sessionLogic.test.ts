@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { pushToTalkState, resumeAfterSpeech, shouldIgnoreAsync } from './sessionLogic.ts';
+import {
+  afterCommandResume,
+  pushToTalkState,
+  resumeAfterSpeech,
+  shouldIgnoreAsync,
+} from './sessionLogic.ts';
 
 describe('resumeAfterSpeech', () => {
   it('returns listening after a wake-only Yes?', () => {
@@ -22,6 +27,13 @@ describe('resumeAfterSpeech', () => {
       resumeAfterSpeech({ sessionOff: true, gatePending: false, requested: 'listening' }),
       'off',
     );
+  });
+});
+
+describe('afterCommandResume', () => {
+  it('stays in listening so the next utterance skips the wake word', () => {
+    assert.equal(afterCommandResume(false), 'listening');
+    assert.equal(afterCommandResume(true), 'confirming');
   });
 });
 

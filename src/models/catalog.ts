@@ -1,4 +1,5 @@
 import { Directory, File, Paths } from 'expo-file-system';
+import type { Locale } from '../i18n/wake';
 
 /**
  * Model files are far too big to ship inside the APK (the Metro bundler also caps
@@ -51,19 +52,37 @@ export const MODELS: ModelSpec[] = [
     id: 'whisper-tiny-en',
     kind: 'stt',
     label: 'Whisper tiny.en (Q5_1)',
-    note: 'Recommended. Fast enough for continuous wake-word listening.',
+    note: 'English only. Fast enough for continuous wake-word listening.',
     bytes: 32_166_155,
     url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en-q5_1.bin',
     fileName: 'ggml-tiny.en-q5_1.bin',
   },
   {
+    id: 'whisper-tiny',
+    kind: 'stt',
+    label: 'Whisper tiny multilingual (Q5_1)',
+    note: 'English and Spanish. Use this if you speak Spanish.',
+    bytes: 32_152_673,
+    url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny-q5_1.bin',
+    fileName: 'ggml-tiny-q5_1.bin',
+  },
+  {
     id: 'whisper-base-en',
     kind: 'stt',
     label: 'Whisper base.en (Q5_1)',
-    note: 'More accurate, noticeably slower on older phones.',
+    note: 'English only. More accurate, noticeably slower on older phones.',
     bytes: 59_721_011,
     url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en-q5_1.bin',
     fileName: 'ggml-base.en-q5_1.bin',
+  },
+  {
+    id: 'whisper-base',
+    kind: 'stt',
+    label: 'Whisper base multilingual (Q5_1)',
+    note: 'English and Spanish. More accurate, slower on older phones.',
+    bytes: 59_707_625,
+    url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base-q5_1.bin',
+    fileName: 'ggml-base-q5_1.bin',
   },
 ];
 
@@ -159,4 +178,9 @@ export function formatBytes(bytes: number): string {
   if (bytes >= 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(2)} GB`;
   if (bytes >= 1_000_000) return `${Math.round(bytes / 1_000_000)} MB`;
   return `${Math.round(bytes / 1000)} kB`;
+}
+
+export function recommendedStt(locale: Locale): ModelSpec {
+  const id = locale === 'es' ? 'whisper-tiny' : 'whisper-tiny-en';
+  return MODELS.find((model) => model.id === id) ?? MODELS.find((model) => model.kind === 'stt')!;
 }

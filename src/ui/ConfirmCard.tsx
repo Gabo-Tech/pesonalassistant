@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useT } from '../i18n';
 import { useTheme } from './ThemeProvider';
 import { Bento, BentoLabel } from './Bento';
 import { Body, Meta } from './Type';
@@ -24,10 +25,11 @@ export function ConfirmCard({
   onCancel: () => void;
 }) {
   const t = useTheme();
+  const tr = useT();
 
   return (
     <Bento span={2} style={{ gap: 12 }}>
-      <BentoLabel>Confirm</BentoLabel>
+      <BentoLabel>{tr('confirm.title')}</BentoLabel>
       <Body>{pending.summary}</Body>
       <Body style={{ color: t.dim }}>{pending.detail}</Body>
 
@@ -44,7 +46,7 @@ export function ConfirmCard({
           ]}
           onPress={onCancel}
         >
-          <Meta style={{ color: t.dim }}>Cancel</Meta>
+          <Meta style={{ color: t.dim }}>{tr('common.cancel')}</Meta>
         </Pressable>
         <Pressable
           style={[
@@ -62,10 +64,10 @@ export function ConfirmCard({
 
       <Meta>
         {voiceHint && micReady
-          ? 'Tap a button, or say send or cancel'
+          ? tr('voice.confirmTapOrSay')
           : voiceHint
-            ? 'Tap a button, or type send / cancel'
-            : 'Voice confirmation is off. Use the buttons'}
+            ? tr('voice.confirmTapOrType')
+            : tr('voice.confirmOff')}
       </Meta>
     </Bento>
   );

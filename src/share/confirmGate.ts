@@ -153,15 +153,20 @@ export function clearOutcome(): void {
 
 const CANCEL_PHRASES = [
   'cancel',
+  'cancelar',
   'no',
   'nope',
   'stop',
+  'para',
   'dont send',
   'do not send',
+  'no enviar',
+  'no envies',
   'dont',
   'nevermind',
   'never mind',
   'forget it',
+  'olvidalo',
   'abort',
   'discard',
 ];
@@ -170,19 +175,26 @@ const CONFIRM_PHRASES = [
   'send',
   'send it',
   'sent it',
+  'enviar',
+  'envialo',
+  'envia',
   'yes',
+  'si',
   'yes send',
   'yes send it',
   'yeah',
   'yep',
   'yup',
   'confirm',
+  'confirmar',
   'confirmed',
   'do it',
   'go ahead',
+  'adelante',
   'post',
   'post it',
   'publish',
+  'publicar',
   'okay send',
   'ok send',
   'sure',
@@ -192,6 +204,8 @@ const CONFIRM_PHRASES = [
 export function normalizeDecisionText(text: string): string {
   return text
     .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/['\u2019]/g, '')
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\bdon t\b/g, 'dont')

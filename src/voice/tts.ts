@@ -1,13 +1,21 @@
 import * as Speech from 'expo-speech';
+import { localeTag } from '../i18n/wake';
+import { peekSettings } from '../settings/store';
+import { rankVoices, type RankedVoice } from './voices';
 
 /**
  * Text to speech via the Android system engine.
  *
- * Using the OS voice instead of a neural TTS model keeps another few hundred megabytes
- * off the phone, works offline, and respects the voice the user already picked.
+ * Enhanced/Premium voices on the phone are on-device neural packs (Google/Samsung).
+ * The user picks one in Settings; we never upload the spoken text.
  */
 
 let speaking = false;
+
+export async function listTtsVoices(): Promise<RankedVoice[]> {
+  const voices = await Speech.getAvailableVoicesAsync();
+  return rankVoices(voices, peekSettings().locale);
+}
 
 /** Speaks and resolves when the utterance finishes (or fails). */
 export function speak(text: string, onDone?: () => void): void {
@@ -22,10 +30,12 @@ export function speak(text: string, onDone?: () => void): void {
     onDone?.();
   };
 
+  const settings = peekSettings();
   Speech.speak(text, {
-    language: 'en-US',
-    rate: 1.0,
-    pitch: 1.0,
+    language: localeTag(settings.locale),
+    voice: settings.ttsVoiceId ?? undefined,
+    rate: settings.ttsRate || 1,
+    pitch: settings.ttsPitch || 1,
     onDone: finish,
     onStopped: finish,
     onError: finish,

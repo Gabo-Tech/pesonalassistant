@@ -54,6 +54,39 @@ export async function listReminders(includeCompleted = false): Promise<Reminder[
   return db.getAllAsync<Reminder>(sql);
 }
 
+export async function getReminder(id: number): Promise<Reminder | null> {
+  const db = await getDb();
+  return db.getFirstAsync<Reminder>('SELECT * FROM reminders WHERE id = ?', id);
+}
+
+export async function updateReminder(
+  id: number,
+  patch: { text?: string; dueAt?: number },
+): Promise<Reminder> {
+  const db = await getDb();
+  const existing = await getReminder(id);
+  if (!existing) throw new Error(`Reminder ${id} not found`);
+
+  const text = patch.text?.trim() || existing.text;
+  const dueAt = patch.dueAt ?? existing.due_at;
+  if (dueAt <= Date.now()) throw new Error('That time has already passed.');
+
+  await cancelReminderNotification(existing.notification_id);
+  const notificationId = await scheduleReminderNotification(text, dueAt);
+  if (!notificationId) throw new Error('Cannot set a reminder without notification permission.');
+
+  await db.runAsync(
+    'UPDATE reminders SET text = ?, due_at = ?, notification_id = ?, completed = 0 WHERE id = ?',
+    text,
+    dueAt,
+    notificationId,
+    id,
+  );
+  const row = await getReminder(id);
+  if (!row) throw new Error('Failed to update reminder');
+  return row;
+}
+
 export async function completeReminder(id: number): Promise<void> {
   const db = await getDb();
   const row = await db.getFirstAsync<Reminder>('SELECT * FROM reminders WHERE id = ?', id);

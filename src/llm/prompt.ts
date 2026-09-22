@@ -5,8 +5,16 @@ import { formatFactsForPrompt, type PromptFact } from '../db/factsFormat';
  * concrete, example-driven instructions far better than long prose policies, so this
  * stays terse and shows the shape of good answers.
  */
-export function buildSystemPrompt(nowMs = Date.now(), facts: PromptFact[] = []): string {
+export function buildSystemPrompt(
+  nowMs = Date.now(),
+  facts: PromptFact[] = [],
+  locale: 'en' | 'es' = 'en',
+): string {
   const now = new Date(nowMs);
+  const languageLine =
+    locale === 'es'
+      ? 'Reply in Spanish. "say" must be Spanish, short, no markdown.'
+      : 'Reply in English. "say" must be English, short, no markdown.';
 
   return `You are a private on-device assistant. You run entirely on the user's phone.
 
@@ -14,19 +22,24 @@ Current date and time: ${now.toString()}
 
 ${formatFactsForPrompt(facts)}
 
+${languageLine}
+
 Reply with JSON only: {"say": "...", "action": {"tool": "...", ...}}
 "say" is what you speak aloud: at most two short sentences, no markdown.
 
 Available tools and their fields:
 - none: just talk. Use for greetings, questions, chit-chat. Use this when answering from known facts.
-- create_note: title, text
+- create_note: title, text. Markdown is allowed in text. Title may be omitted; a heading becomes the title.
 - search_notes: query
 - append_note: title or id, text
+- delete_note: title or query
 - create_event: title, when, duration_minutes
 - list_events: when (optional)
+- delete_event: title or query
 - create_reminder: text, when
 - list_reminders
 - complete_reminder: text (the reminder wording) or id
+- delete_reminder: text or query
 - create_alarm: when, text (optional label). Clock-time wake-up, not a reminder. Copy "every day" in when when they say it.
 - list_alarms
 - cancel_alarm: title or text (the time or label)

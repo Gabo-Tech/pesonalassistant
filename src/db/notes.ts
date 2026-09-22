@@ -41,6 +41,11 @@ export async function searchNotes(query: string, limit = 20): Promise<Note[]> {
   );
 }
 
+export async function getNote(id: number): Promise<Note | null> {
+  const db = await getDb();
+  return db.getFirstAsync<Note>('SELECT * FROM notes WHERE id = ?', id);
+}
+
 export async function updateNote(
   id: number,
   patch: { title?: string; body?: string },

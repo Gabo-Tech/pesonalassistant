@@ -19,6 +19,18 @@ describe('parseWhen', () => {
     assert.equal(date.getHours(), 9);
   });
 
+  it('parses Spanish relative and mañana', () => {
+    const relative = parseWhen('en 20 minutos', noonMonday);
+    assert.ok(relative);
+    assert.equal(relative.at, noonMonday + 20 * 60_000);
+
+    const morning = parseWhen('mañana a las 9', noonMonday);
+    assert.ok(morning);
+    const date = new Date(morning.at);
+    assert.equal(date.getDate(), 22);
+    assert.equal(date.getHours(), 9);
+  });
+
   it('rolls a past clock time to tomorrow', () => {
     const parsed = parseWhen('at 9am', noonMonday);
     assert.ok(parsed);
@@ -31,6 +43,7 @@ describe('parseRepeat', () => {
     assert.equal(parseRepeat('7am'), 'once');
     assert.equal(parseRepeat('every day at 7'), 'daily');
     assert.equal(parseRepeat('wake me daily at 7am'), 'daily');
+    assert.equal(parseRepeat('todos los días a las 7'), 'daily');
   });
 });
 

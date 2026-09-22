@@ -1,6 +1,7 @@
 import { initLlama, type LlamaContext } from 'llama.rn';
 import { listFacts } from '../db/facts';
 import { recentTurns } from '../db/turns';
+import { peekSettings } from '../settings/store';
 import { fallbackAsk } from './fallback';
 import { buildSystemPrompt } from './prompt';
 import { parseReply, REPLY_SCHEMA, type AssistantReply } from './tools';
@@ -96,12 +97,13 @@ export async function unloadLlm(): Promise<void> {
  * always parseable JSON with a valid tool name.
  */
 export async function ask(userText: string): Promise<AssistantReply> {
-  if (!context) return fallbackAsk(userText);
+  if (!context) return fallbackAsk(userText, peekSettings().locale);
 
   const [history, facts] = await Promise.all([recentTurns(6), listFacts()]);
+  const locale = peekSettings().locale;
 
   const messages = [
-    { role: 'system', content: buildSystemPrompt(Date.now(), facts) },
+    { role: 'system', content: buildSystemPrompt(Date.now(), facts, locale) },
     ...history
       .filter((turn) => turn.role !== 'system')
       .map((turn) => ({ role: turn.role, content: turn.text })),

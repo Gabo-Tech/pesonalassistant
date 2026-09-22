@@ -1,4 +1,6 @@
 import { initWhisper, type WhisperContext } from 'whisper.rn';
+import { peekSettings } from '../settings/store';
+import { whisperLanguage } from './sttLanguage';
 
 /**
  * Speech to text with whisper.cpp, fully offline.
@@ -67,8 +69,10 @@ export async function transcribe(samples: Float32Array): Promise<string> {
   const buffer = new ArrayBuffer(samples.length * 4);
   new Float32Array(buffer).set(samples);
 
+  const language = whisperLanguage(peekSettings().locale, loadedPath);
+
   const { promise } = context.transcribeData(buffer, {
-    language: 'en',
+    language,
     maxThreads: 4,
     // No timestamps, no context carry-over: each command is independent.
     tokenTimestamps: false,

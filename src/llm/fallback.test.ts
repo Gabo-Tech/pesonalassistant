@@ -68,4 +68,17 @@ describe('fallbackAsk', () => {
     assert.equal(reply.action, undefined);
     assert.match(reply.say, /Settings/);
   });
+
+  it('creates a Spanish note, alarm, and reminder', () => {
+    const note = fallbackAsk('anota que la wifi es hunter2', 'es');
+    assert.equal(note.action?.tool, 'create_note');
+    assert.match(note.action?.text ?? '', /hunter2/);
+
+    const alarm = fallbackAsk('pon una alarma a las 7am', 'es');
+    assert.equal(alarm.action?.tool, 'create_alarm');
+
+    const reminder = fallbackAsk('recuérdame llamar a mamá mañana a las 9', 'es');
+    assert.equal(reminder.action?.tool, 'create_reminder');
+    assert.match(reminder.action?.when ?? '', /mañana/i);
+  });
 });

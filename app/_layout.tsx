@@ -1,9 +1,11 @@
 import { Tabs } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BootProvider } from '../src/boot';
+import { useT } from '../src/i18n';
 import { Onboarding } from '../src/onboarding/Onboarding';
 import { getRingingAlarm, subscribeAlarmRing, type RingingAlarm } from '../src/notify/alarmRing';
 import { useSettings } from '../src/settings/store';
@@ -62,6 +64,7 @@ function ThemedShell() {
 
 function ThemedTabs({ hideChrome }: { hideChrome: boolean }) {
   const t = useTheme();
+  const tr = useT();
 
   return (
     <Tabs
@@ -94,10 +97,42 @@ function ThemedTabs({ hideChrome }: { hideChrome: boolean }) {
         sceneStyle: { backgroundColor: t.bg },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Assistant' }} />
-      <Tabs.Screen name="notes" options={{ title: 'Notes' }} />
-      <Tabs.Screen name="agenda" options={{ title: 'Agenda' }} />
-      <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: tr('tabs.assistant'),
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="notes"
+        options={{
+          title: tr('tabs.notes'),
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'document-text' : 'document-text-outline'} size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="agenda"
+        options={{
+          title: tr('tabs.agenda'),
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: tr('tabs.settings'),
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'settings' : 'settings-outline'} size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

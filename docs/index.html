@@ -8,7 +8,7 @@
       name="description"
       content="A private on-device Android voice assistant. Notes, calendar, reminders, and alarms stay on the phone. Nothing is sent until you confirm."
     />
-    <link rel="stylesheet" href="styles.css?v=2" />
+    <link rel="stylesheet" href="styles.css?v=3" />
     <script>
       (function () {
         try {
@@ -36,7 +36,7 @@
           <a class="nav-link" href="https://github.com/Gabo-Tech/pesonalassistant">GitHub</a>
           <a
             class="btn"
-            href="https://github.com/Gabo-Tech/pesonalassistant/releases/latest/download/assistant-1.3.0.apk"
+            href="https://github.com/Gabo-Tech/pesonalassistant/releases/latest/download/assistant-1.4.0.apk"
             >Download</a
           >
         </div>
@@ -54,45 +54,61 @@
           <div class="hero-actions">
             <a
               class="btn"
-              href="https://github.com/Gabo-Tech/pesonalassistant/releases/latest/download/assistant-1.3.0.apk"
+              href="https://github.com/Gabo-Tech/pesonalassistant/releases/latest/download/assistant-1.4.0.apk"
               >Download Android APK</a
             >
-            <p class="meta">Version 1.3.0 · sideload · Android 8 and up</p>
+            <p class="meta">Version 1.4.0 · sideload · Android 8 and up</p>
           </div>
         </div>
 
         <aside class="phone" aria-hidden="true">
           <div class="phone-bezel"><div class="phone-notch"></div></div>
           <div class="orb-wrap">
-            <div class="orb"><div class="orb-core"></div></div>
-            <p class="kicker">Listening</p>
+            <div class="orb">
+              <span class="orb-ring"></span>
+              <div class="orb-core"></div>
+            </div>
+            <p class="kicker status-swap">
+              <span>Listening</span>
+              <span>Thinking</span>
+            </p>
           </div>
           <div class="phone-grid">
             <div class="mini">
               <p class="kicker">You</p>
-              <p>Nothing heard yet</p>
+              <p class="chat-swap">
+                <span>Remind me to call tomorrow at nine</span>
+                <span>Anota comprar café</span>
+              </p>
             </div>
             <div class="mini">
               <p class="kicker">Assistant</p>
-              <p>Waiting</p>
+              <p class="chat-swap">
+                <span>I will remind you tomorrow at 9:00.</span>
+                <span>Nota guardada.</span>
+              </p>
             </div>
           </div>
         </aside>
       </section>
 
-      <section class="section">
+      <section class="section reveal">
         <p class="kicker">Product</p>
         <h2>Quiet tools. No cloud account.</h2>
         <div class="bento">
           <article class="tile">
             <p class="kicker">Notes</p>
             <h3>Write it once</h3>
-            <p>Save a thought by voice or type. Search stays on the device.</p>
+            <p>
+              Title, markdown, and a live preview. Search stays on the device.
+            </p>
           </article>
           <article class="tile">
             <p class="kicker">Agenda</p>
             <h3>Reminders and days</h3>
-            <p>Local reminders, alarms, and the next seven days from your calendar.</p>
+            <p>
+              Local reminders, alarms, and events from a week out to a year.
+            </p>
           </article>
           <article class="tile">
             <p class="kicker">Confirm</p>
@@ -105,14 +121,14 @@
             <p class="kicker">Wake</p>
             <h3>A word you choose</h3>
             <p>
-              Default is “computer”. Always-listen is optional. Typed commands
-              still work.
+              Default is “computer”, or “computadora” in Spanish. Always-listen
+              is optional. Typed commands still work.
             </p>
           </article>
         </div>
       </section>
 
-      <section class="section">
+      <section class="section reveal">
         <p class="kicker">Start</p>
         <h2>Three steps. Then it is yours.</h2>
         <div class="steps">
@@ -143,7 +159,7 @@
         </div>
       </section>
 
-      <section class="privacy">
+      <section class="privacy reveal">
         <article class="tile">
           <p class="kicker">Privacy</p>
           <p>
@@ -156,7 +172,7 @@
       </section>
 
       <footer class="foot">
-        <span>Assistant 1.3.0 · Android 8+</span>
+        <span>Assistant 1.4.0 · Android 8+</span>
         <span>
           <a href="https://github.com/Gabo-Tech/pesonalassistant">Source on GitHub</a>
         </span>
@@ -181,6 +197,28 @@
           btn.addEventListener("click", function () {
             apply(btn.getAttribute("data-appearance"));
           });
+        });
+
+        var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        var reveals = document.querySelectorAll(".reveal");
+        if (reduce || !("IntersectionObserver" in window)) {
+          reveals.forEach(function (el) {
+            el.classList.add("in");
+          });
+          return;
+        }
+        var io = new IntersectionObserver(
+          function (entries) {
+            entries.forEach(function (entry) {
+              if (!entry.isIntersecting) return;
+              entry.target.classList.add("in");
+              io.unobserve(entry.target);
+            });
+          },
+          { threshold: 0.14, rootMargin: "0px 0px -8% 0px" }
+        );
+        reveals.forEach(function (el) {
+          io.observe(el);
         });
       })();
     </script>

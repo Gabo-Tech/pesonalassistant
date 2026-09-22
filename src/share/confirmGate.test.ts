@@ -16,6 +16,13 @@ describe('matchVoiceDecision', () => {
     assert.equal(matchVoiceDecision('post it'), 'confirm');
   });
 
+  it('confirms and cancels Spanish phrases', () => {
+    assert.equal(matchVoiceDecision('enviar'), 'confirm');
+    assert.equal(matchVoiceDecision('sí'), 'confirm');
+    assert.equal(matchVoiceDecision('cancelar'), 'cancel');
+    assert.equal(matchVoiceDecision('no enviar'), 'cancel');
+  });
+
   it('cancels and prefers cancel over confirm', () => {
     assert.equal(matchVoiceDecision('cancel'), 'cancel');
     assert.equal(matchVoiceDecision("no don't send"), 'cancel');

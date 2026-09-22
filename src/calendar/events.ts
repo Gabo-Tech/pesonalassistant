@@ -91,16 +91,57 @@ export async function listEvents(fromMs: number, toMs: number): Promise<SimpleEv
 
   const events = await Calendar.listEvents(calendars, new Date(fromMs), new Date(toMs));
 
-  return events
-    .map((e) => ({
-      id: e.id,
-      title: e.title ?? '(untitled)',
-      start: toMillis(e.startDate),
-      end: toMillis(e.endDate),
-      allDay: Boolean(e.allDay),
-      location: e.location ?? undefined,
-    }))
-    .sort((a, b) => a.start - b.start);
+  return events.map(toSimple).sort((a, b) => a.start - b.start);
+}
+
+export async function getEvent(id: string): Promise<SimpleEvent | null> {
+  if (!(await ensureCalendarPermission())) return null;
+  try {
+    const event = await Calendar.ExpoCalendarEvent.get(id);
+    return toSimple(event);
+  } catch {
+    return null;
+  }
+}
+
+export async function updateEvent(
+  id: string,
+  patch: { title?: string; start?: number; end?: number; location?: string },
+): Promise<SimpleEvent> {
+  const event = await Calendar.ExpoCalendarEvent.get(id);
+  const start = patch.start ?? toMillis(event.startDate);
+  const end = patch.end ?? toMillis(event.endDate) ?? start + 60 * 60 * 1000;
+  await event.update({
+    title: patch.title ?? event.title,
+    startDate: new Date(start),
+    endDate: new Date(end),
+    location: patch.location ?? event.location,
+  });
+  const fresh = await Calendar.ExpoCalendarEvent.get(id);
+  return toSimple(fresh);
+}
+
+export async function deleteEvent(id: string): Promise<void> {
+  const event = await Calendar.ExpoCalendarEvent.get(id);
+  await event.delete();
+}
+
+function toSimple(event: {
+  id: string;
+  title?: string | null;
+  startDate?: Date | string;
+  endDate?: Date | string;
+  allDay?: boolean | null;
+  location?: string | null;
+}): SimpleEvent {
+  return {
+    id: event.id,
+    title: event.title ?? '(untitled)',
+    start: toMillis(event.startDate),
+    end: toMillis(event.endDate),
+    allDay: Boolean(event.allDay),
+    location: event.location ?? undefined,
+  };
 }
 
 function toMillis(value: Date | string | undefined): number {

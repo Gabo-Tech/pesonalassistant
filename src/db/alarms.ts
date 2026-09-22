@@ -72,6 +72,46 @@ export async function listAlarms(): Promise<Alarm[]> {
   );
 }
 
+export async function updateAlarm(
+  id: number,
+  patch: { label?: string; hour?: number; minute?: number; repeat?: AlarmRepeat },
+): Promise<Alarm> {
+  const existing = await getAlarm(id);
+  if (!existing) throw new Error(`Alarm ${id} not found`);
+
+  const label = patch.label !== undefined ? patch.label.trim() : existing.label;
+  const hour = patch.hour ?? existing.hour;
+  const minute = patch.minute ?? existing.minute;
+  const repeat = patch.repeat ?? existing.repeat;
+  const nextAt = nextOccurrence(hour, minute);
+
+  await cancelAlarmNotification(existing.notification_id);
+  const notificationId = await scheduleAlarmNotification({
+    alarmId: id,
+    label,
+    hour,
+    minute,
+    dueAt: nextAt,
+  });
+  if (!notificationId) throw new Error('Cannot set an alarm without notification permission.');
+
+  const db = await getDb();
+  await db.runAsync(
+    `UPDATE alarms SET label = ?, hour = ?, minute = ?, next_at = ?, repeat = ?, notification_id = ?, enabled = 1
+     WHERE id = ?`,
+    label,
+    hour,
+    minute,
+    nextAt,
+    repeat,
+    notificationId,
+    id,
+  );
+  const row = await getAlarm(id);
+  if (!row) throw new Error('Failed to update alarm');
+  return row;
+}
+
 export async function cancelAlarm(id: number): Promise<void> {
   const db = await getDb();
   const row = await getAlarm(id);

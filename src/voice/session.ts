@@ -8,13 +8,16 @@ import {
   resumeExpiry,
   subscribeGate,
 } from '../share/confirmGate';
-import { addTurn } from '../db/turns';
+import { t } from '../i18n';
+import { addTurn, clearTurns } from '../db/turns';
 import { peekSettings } from '../settings/store';
 import { speak, stopSpeaking } from './tts';
-import { transcribe } from './stt';
+import { isSttReady, transcribe } from './stt';
 import { EnergyVad } from './vad';
 import { detectWake } from './wake';
 import {
+  CONVERSATION_IDLE_MS,
+  afterCommandResume,
   pushToTalkState,
   resumeAfterSpeech,
   shouldIgnoreAsync,
@@ -58,6 +61,7 @@ class VoiceSession {
   private busy = false;
   /** Bumped on stop / new command so in-flight STT, LLM, and TTS cannot revive the session. */
   private generation = 0;
+  private conversationTimer: ReturnType<typeof setTimeout> | null = null;
 
   private readonly vad = new EnergyVad({
     onSpeechStart: () => {
@@ -110,13 +114,17 @@ class VoiceSession {
   start(): void {
     if (this.snapshot.state === 'off') {
       this.vad.reset();
-      this.update({ state: 'idle', error: null });
+      this.update({
+        state: 'idle',
+        error: isSttReady() ? null : t('stt.missing'),
+      });
     }
   }
 
   stop(): void {
     this.generation += 1;
     this.busy = false;
+    this.clearConversationIdle();
     this.vad.reset();
     stopSpeaking();
     this.update({ state: 'off', hearingSpeech: false });
@@ -129,12 +137,15 @@ class VoiceSession {
   beginPushToTalk(): void {
     stopSpeaking();
     this.vad.reset();
+    this.clearConversationIdle();
     const next = pushToTalkState(Boolean(getGateState().pending));
+    const missing = !isSttReady();
     this.update({
       state: next,
-      error: null,
+      error: missing ? t('stt.missing') : null,
       heard: next === 'listening' ? '' : this.snapshot.heard,
     });
+    if (next === 'listening' && !missing) this.armConversationIdle();
   }
 
   pushAudio(samples: Float32Array, sampleRate: number): void {
@@ -152,6 +163,7 @@ class VoiceSession {
     const capturedState = this.snapshot.state;
     const gen = this.generation;
     this.busy = true;
+    this.clearConversationIdle();
 
     const confirming = capturedState === 'confirming' || Boolean(getGateState().pending);
     if (confirming) pauseExpiry();
@@ -181,13 +193,15 @@ class VoiceSession {
         await this.runCommand(remainder, gen);
       } else {
         this.update({ state: 'listening', heard: '' });
-        this.say('Yes?', 'listening', gen);
+        this.say(t('voice.yes'), 'listening', gen);
       }
     } catch (error) {
       if (shouldIgnoreAsync(gen, this.generation, this.snapshot.state)) return;
+      const raw = error instanceof Error ? error.message : String(error);
+      const missing = /not loaded/i.test(raw);
       this.update({
         state: 'idle',
-        error: error instanceof Error ? error.message : String(error),
+        error: missing ? t('stt.missing') : raw,
       });
     } finally {
       if (gen === this.generation) this.busy = false;
@@ -220,7 +234,7 @@ class VoiceSession {
 
     await addTurn('assistant', routed.message);
     this.busy = false;
-    this.say(routed.message, routed.awaitingConfirm ? 'confirming' : 'idle', gen);
+    this.say(routed.message, afterCommandResume(routed.awaitingConfirm), gen);
   }
 
   async submitText(text: string): Promise<void> {
@@ -269,6 +283,7 @@ class VoiceSession {
         requested: resume,
       });
       this.update({ state: next });
+      if (next === 'listening') this.armConversationIdle();
     };
 
     if (!peekSettings().speakReplies) {
@@ -283,7 +298,25 @@ class VoiceSession {
 
   cancelConfirmation(): void {
     cancelPending();
-    this.say('Cancelled.');
+    this.say(t('voice.cancelled'));
+  }
+
+  async clearChat(): Promise<void> {
+    await clearTurns();
+    this.update({ heard: '', said: '' });
+  }
+
+  private armConversationIdle(): void {
+    this.clearConversationIdle();
+    this.conversationTimer = setTimeout(() => {
+      if (this.snapshot.state === 'listening') this.update({ state: 'idle' });
+    }, CONVERSATION_IDLE_MS);
+  }
+
+  private clearConversationIdle(): void {
+    if (!this.conversationTimer) return;
+    clearTimeout(this.conversationTimer);
+    this.conversationTimer = null;
   }
 }
 

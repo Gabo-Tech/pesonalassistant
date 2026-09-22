@@ -102,3 +102,13 @@ function webFallbackUrl(target: ShareTarget, text: string, recipient?: string | 
 export async function openAccessibilitySettings(): Promise<void> {
   await IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.ACCESSIBILITY_SETTINGS);
 }
+
+/** Opens Android text-to-speech settings so the user can install neural language packs. */
+export async function openTtsSettings(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  try {
+    await IntentLauncher.startActivityAsync('com.android.settings.TTS_SETTINGS');
+  } catch {
+    await IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.ACCESSIBILITY_SETTINGS);
+  }
+}
