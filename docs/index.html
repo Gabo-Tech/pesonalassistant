@@ -8,7 +8,7 @@
       name="description"
       content="Free on-device Android voice assistant. Notes, calendar, reminders, and alarms stay on the phone. A live search sends only that query."
     />
-    <link rel="stylesheet" href="styles.css?v=7" />
+    <link rel="stylesheet" href="styles.css?v=8" />
   </head>
   <body>
     <header class="menubar">
@@ -24,8 +24,8 @@
       <span class="cursor" aria-hidden="true"></span>
     </header>
 
-    <main class="desktop">
-      <section class="window hero-window">
+    <main class="stack">
+      <section class="window reveal">
         <div class="titlebar">
           <span class="close" aria-hidden="true"></span>
           <h1>Assistant</h1>
@@ -35,9 +35,8 @@
           <p class="kicker">On-device · Android · no account</p>
           <p class="headline">A voice that never leaves the phone.</p>
           <p class="pitch">
-            Free assistant for notes, calendar, reminders, alarms, and memory.
-            Speech and the model run here. Messages open as a draft, and only
-            after you confirm. A live-fact search sends only that query.
+            A free assistant for notes, your calendar, reminders, and alarms.
+            Speech and the model run here.
           </p>
           <p class="transcript" id="transcript">Listening…</p>
           <a
@@ -49,36 +48,95 @@
         </div>
       </section>
 
-      <aside class="window side-window" aria-hidden="true">
-        <div class="titlebar">
-          <span class="close"></span>
-          <p>Finder</p>
-          <span class="stripes"></span>
-        </div>
-        <ul class="files">
-          <li>Notes</li>
-          <li>Agenda</li>
-          <li>Confirm</li>
-          <li>English / Español</li>
-          <li>0.5B model</li>
-        </ul>
-      </aside>
-
-      <section class="window chat-window">
+      <section class="window reveal">
         <div class="titlebar">
           <span class="close" aria-hidden="true"></span>
-          <p>Conversation</p>
+          <p>Why it is free</p>
           <span class="stripes" aria-hidden="true"></span>
         </div>
-        <div class="chat">
-          <div class="pair fade-a">
-            <p class="you">You: Remind me tomorrow at nine</p>
-            <p class="bot">Assistant: I will remind you tomorrow at 9:00.</p>
-          </div>
-          <div class="pair fade-b">
-            <p class="you">You: Anota comprar café</p>
-            <p class="bot">Assistant: Nota guardada.</p>
-          </div>
+        <div class="window-body">
+          <p class="pitch">
+            No account. No subscription. Speech recognition and the language
+            model stay on this phone. A live-fact search sends only that query.
+            Messages open as a draft, and only after you confirm.
+          </p>
+        </div>
+      </section>
+
+      <section class="window reveal">
+        <div class="titlebar">
+          <span class="close" aria-hidden="true"></span>
+          <p>What it does</p>
+          <span class="stripes" aria-hidden="true"></span>
+        </div>
+        <ul class="features">
+          <li>
+            <strong>Notes</strong>
+            Title, markdown, and a live preview. Search stays on the device.
+          </li>
+          <li>
+            <strong>Agenda</strong>
+            Events from a week out to a year, plus reminders you can edit.
+          </li>
+          <li>
+            <strong>Alarms</strong>
+            In-app alarms. Daily if you say every day. Dismiss or snooze.
+          </li>
+          <li>
+            <strong>Confirm</strong>
+            WhatsApp, Signal, and X open a draft. You tap Send, or say send.
+          </li>
+          <li>
+            <strong>Two languages</strong>
+            English or Spanish for the interface, speech, and spoken replies.
+          </li>
+          <li>
+            <strong>Your model</strong>
+            Start light at 0.5B. Keep heavier models downloaded and switch when you want.
+          </li>
+          <li>
+            <strong>Live facts</strong>
+            Prices, news, and public events. One search. Only that query leaves the phone.
+          </li>
+        </ul>
+      </section>
+
+      <section class="window reveal">
+        <div class="titlebar">
+          <span class="close" aria-hidden="true"></span>
+          <p>How to start</p>
+          <span class="stripes" aria-hidden="true"></span>
+        </div>
+        <ol class="steps">
+          <li>
+            <strong>Install the APK</strong>
+            Android will ask you to allow this source. That is expected for a sideload.
+          </li>
+          <li>
+            <strong>A short first open</strong>
+            Privacy, microphone, wake word, then optional models. You can skip the download and type.
+          </li>
+          <li>
+            <strong>Talk or type</strong>
+            Tap the orb, say the wake word, or use the composer. Confirm before anything leaves.
+          </li>
+        </ol>
+      </section>
+
+      <section class="window reveal">
+        <div class="titlebar">
+          <span class="close" aria-hidden="true"></span>
+          <p>Get it</p>
+          <span class="stripes" aria-hidden="true"></span>
+        </div>
+        <div class="window-body">
+          <p class="pitch">Free. On your phone. Nothing to subscribe to.</p>
+          <a
+            class="btn"
+            href="https://github.com/Gabo-Tech/pesonalassistant/releases/latest/download/assistant-1.6.0.apk"
+            >Download the free APK</a
+          >
+          <p class="meta">Version 1.6.0 · Android 8 and up</p>
         </div>
       </section>
     </main>
@@ -91,11 +149,33 @@
           "Listening…",
           "Remind me tomorrow at nine",
           "I will remind you tomorrow at 9:00.",
-          "Anota comprar café",
-          "Nota guardada.",
+          "What's the price of gold?",
+          "Looking that up.",
         ];
         var el = document.getElementById("transcript");
         var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        var reveals = document.querySelectorAll(".reveal");
+
+        if (reduce || !("IntersectionObserver" in window)) {
+          reveals.forEach(function (node) {
+            node.classList.add("in");
+          });
+        } else {
+          var io = new IntersectionObserver(
+            function (entries) {
+              entries.forEach(function (entry) {
+                if (!entry.isIntersecting) return;
+                entry.target.classList.add("in");
+                io.unobserve(entry.target);
+              });
+            },
+            { threshold: 0.2, rootMargin: "0px 0px -30% 0px" }
+          );
+          reveals.forEach(function (node) {
+            io.observe(node);
+          });
+        }
+
         if (!el || reduce) {
           if (el) el.textContent = lines[2];
           return;
