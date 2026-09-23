@@ -1,12 +1,13 @@
 import { initWhisper, type WhisperContext } from 'whisper.rn';
 import { peekSettings } from '../settings/store';
+import { floatToPcm16 } from './pcm';
 import { whisperLanguage } from './sttLanguage';
 
 /**
  * Speech to text with whisper.cpp, fully offline.
  *
- * whisper expects 16 kHz mono audio. The microphone hook resamples to that rate
- * before we get here, so transcribeData always sees 16 kHz float32 PCM.
+ * whisper expects 16 kHz mono audio. The microphone hook resamples to that rate.
+ * whisper.rn reads the ArrayBuffer as signed 16-bit PCM, so we convert here.
  */
 
 export const WHISPER_SAMPLE_RATE = 16_000;
@@ -65,9 +66,7 @@ export async function unloadStt(): Promise<void> {
 export async function transcribe(samples: Float32Array): Promise<string> {
   if (!context) throw new Error('Speech model is not loaded yet.');
 
-  // Copy into a standalone ArrayBuffer: the VAD may reuse its backing store.
-  const buffer = new ArrayBuffer(samples.length * 4);
-  new Float32Array(buffer).set(samples);
+  const buffer = floatToPcm16(samples);
 
   const language = whisperLanguage(peekSettings().locale, loadedPath);
 

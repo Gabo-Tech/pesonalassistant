@@ -12,6 +12,7 @@ import { armSend } from '../share/crawler';
 import { openDraft, TARGETS, type ShareTarget } from '../share/intents';
 import { peekSettings } from '../settings/store';
 import { findUniqueMatch } from './match';
+import { chatAnswer, wantsAppendNote, wantsSavedNote } from './noteIntent';
 import { formatClockTime, formatWhen, parseRepeat, parseWhen } from './time';
 import type { Action } from './tools';
 
@@ -38,13 +39,18 @@ function clockLabel(hour: number, minute: number): string {
 }
 
 /** Executes a model action, or queues it for confirmation if it has side effects. */
-export async function routeAction(action: Action, fallbackSay: string): Promise<RouteResult> {
+export async function routeAction(
+  action: Action,
+  fallbackSay: string,
+  userText = '',
+): Promise<RouteResult> {
   const timeout = peekSettings().confirmTimeoutMs;
 
   switch (action.tool) {
     /* ---------------- notes: local and reversible, so no confirm ---------------- */
     case 'create_note': {
       const body = action.text?.trim() ?? '';
+      if (!wantsSavedNote(userText)) return ok(chatAnswer(fallbackSay, body));
       const title = inferNoteTitle(body, action.title);
       await createNote(title, body);
       return ok(t('router.savedNote', { title }));
@@ -52,6 +58,7 @@ export async function routeAction(action: Action, fallbackSay: string): Promise<
 
     case 'append_note': {
       const extra = action.text?.trim();
+      if (!wantsAppendNote(userText)) return ok(chatAnswer(fallbackSay, extra));
       if (!extra) return ok(t('router.whatAdd'));
 
       let id = action.id;

@@ -1,5 +1,7 @@
 import { ask } from '../llm/engine';
 import { routeAction } from '../llm/router';
+import type { AssistantReply } from '../llm/tools';
+import { formatHits, searchFollowUp, searchWeb } from '../search/web';
 import {
   applyVoiceDecision,
   cancelPending,
@@ -241,11 +243,11 @@ class VoiceSession {
     await addTurn('user', text);
     if (shouldIgnoreAsync(gen, this.generation, this.snapshot.state)) return;
 
-    const reply = await ask(text);
-    if (shouldIgnoreAsync(gen, this.generation, this.snapshot.state)) return;
+    const reply = await this.replyFor(text, gen);
+    if (!reply || shouldIgnoreAsync(gen, this.generation, this.snapshot.state)) return;
 
     const routed = reply.action
-      ? await routeAction(reply.action, reply.say)
+      ? await routeAction(reply.action, reply.say, text)
       : { message: reply.say, awaitingConfirm: false };
 
     if (shouldIgnoreAsync(gen, this.generation, this.snapshot.state)) return;
@@ -253,6 +255,31 @@ class VoiceSession {
     await addTurn('assistant', routed.message);
     this.busy = false;
     this.say(routed.message, afterCommandResume(routed.awaitingConfirm), gen);
+  }
+
+  /** One optional web lookup, then a single answer. A second search request is not fetched. */
+  private async replyFor(text: string, gen: number): Promise<AssistantReply | null> {
+    const first = await ask(text);
+    if (shouldIgnoreAsync(gen, this.generation, this.snapshot.state)) return null;
+    if (first.action?.tool !== 'web_search') return first;
+
+    const query = first.action.query?.trim() || first.action.text?.trim() || text;
+    this.update({ state: 'thinking', error: t('search.looking') });
+    try {
+      const hits = await searchWeb(query);
+      if (shouldIgnoreAsync(gen, this.generation, this.snapshot.state)) return null;
+      this.update({ error: null });
+      if (hits.length === 0) return { say: t('search.empty') };
+
+      const second = await ask(searchFollowUp(query, hits));
+      if (shouldIgnoreAsync(gen, this.generation, this.snapshot.state)) return null;
+      if (second.action?.tool === 'web_search') return { say: formatHits(hits) };
+      return second;
+    } catch {
+      if (shouldIgnoreAsync(gen, this.generation, this.snapshot.state)) return null;
+      this.update({ error: null });
+      return { say: t('search.failed') };
+    }
   }
 
   async submitText(text: string): Promise<void> {

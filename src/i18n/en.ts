@@ -24,7 +24,7 @@ export const en = {
   'home.composer': 'Type a command if you would rather not speak',
   'home.go': 'Go',
   'home.privacy':
-    'Speech and reasoning run on this phone. Nothing is sent anywhere until you confirm.',
+    'Speech and reasoning run on this phone. A live-fact search sends only that query. Nothing else leaves until you confirm.',
   'home.notice': 'Notice',
   'home.openSettings': 'Open settings',
   'home.needsModels':
@@ -49,6 +49,9 @@ export const en = {
   'stt.off': 'Tap the orb to talk',
   'stt.englishOnly':
     'This speech model is English-only. Download multilingual Whisper in Settings for Spanish.',
+  'search.looking': 'Looking that up.',
+  'search.empty': 'I could not find that online.',
+  'search.failed': 'The search did not finish.',
   'stt.cantHear':
     'I cannot hear you. Speak closer, or raise microphone sensitivity in Settings.',
   'stt.missed': 'I did not catch that. Try again.',
@@ -168,7 +171,7 @@ export const en = {
     'Even with auto-tap on, nothing is sent until you confirm, and it is authorised for one message at a time.',
   'settings.privacy': 'Privacy',
   'settings.privacyHint':
-    'Speech recognition and the language model run on this device. Notes, reminders, and remembered facts are stored in a local database. Nothing is uploaded.',
+    'Speech recognition and the language model run on this device. Notes, reminders, and remembered facts are stored in a local database. A live-fact search sends only that query. Nothing else is uploaded.',
   'settings.download': 'Download',
   'settings.import': 'Import from Files',
   'settings.loaded': 'Loaded',

@@ -3,131 +3,87 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Assistant — a free voice that never leaves the phone</title>
+    <title>Assistant — a free voice that stays on the phone</title>
     <meta
       name="description"
-      content="Free on-device Android voice assistant. Notes, calendar, reminders, and alarms stay on the phone. Nothing is sent until you confirm."
+      content="Free on-device Android voice assistant. Notes, calendar, reminders, and alarms stay on the phone. A live search sends only that query."
     />
-    <link rel="stylesheet" href="styles.css?v=4" />
+    <link rel="stylesheet" href="styles.css?v=5" />
   </head>
   <body>
-    <div class="grid" aria-hidden="true"></div>
-    <div class="wrap">
-      <header class="nav">
-        <a class="wordmark" href="./">Assistant</a>
-        <div class="nav-end">
-          <span class="free-pill">Free</span>
-          <a class="nav-link" href="https://github.com/Gabo-Tech/pesonalassistant">GitHub</a>
-          <a
-            class="btn"
-            href="https://github.com/Gabo-Tech/pesonalassistant/releases/latest/download/assistant-1.5.0.apk"
-            >Download</a
-          >
-        </div>
-      </header>
+    <header class="menubar">
+      <span class="apple" aria-hidden="true"></span>
+      <span class="menu-word">File</span>
+      <span class="menu-word">Free</span>
+      <a class="menu-word" href="https://github.com/Gabo-Tech/pesonalassistant">GitHub</a>
+      <a
+        class="menu-word download"
+        href="https://github.com/Gabo-Tech/pesonalassistant/releases/latest/download/assistant-1.6.0.apk"
+        >Download</a
+      >
+      <span class="cursor" aria-hidden="true"></span>
+    </header>
 
-      <section class="hero">
-        <div class="hero-copy">
+    <main class="desktop">
+      <section class="window hero-window">
+        <div class="titlebar">
+          <span class="close" aria-hidden="true"></span>
+          <h1>Assistant</h1>
+          <span class="stripes" aria-hidden="true"></span>
+        </div>
+        <div class="window-body">
           <p class="kicker">On-device · Android · no account</p>
-          <h1>A voice that never leaves the phone.</h1>
+          <p class="headline">A voice that never leaves the phone.</p>
           <p class="pitch">
             Free assistant for notes, calendar, reminders, alarms, and memory.
             Speech and the model run here. Messages open as a draft, and only
-            after you confirm.
+            after you confirm. A live-fact search sends only that query.
           </p>
-          <div class="hero-actions">
-            <a
-              class="btn"
-              href="https://github.com/Gabo-Tech/pesonalassistant/releases/latest/download/assistant-1.5.0.apk"
-              >Download the free APK</a
-            >
-            <p class="meta">Version 1.5.0 · sideload · Android 8 and up</p>
-          </div>
-        </div>
-
-        <div class="instrument" aria-hidden="true">
-          <div class="orbital">
-            <span class="ring ring-a"></span>
-            <span class="ring ring-b"></span>
-            <span class="ring ring-c"></span>
-            <span class="sweep"></span>
-            <span class="core"></span>
-          </div>
           <p class="transcript" id="transcript">Listening…</p>
+          <a
+            class="btn"
+            href="https://github.com/Gabo-Tech/pesonalassistant/releases/latest/download/assistant-1.6.0.apk"
+            >Download the free APK</a
+          >
+          <p class="meta">Version 1.6.0 · sideload · Android 8 and up</p>
         </div>
       </section>
 
-      <section class="section reveal">
-        <p class="kicker">On this device</p>
-        <h2>Everything it can do stays local.</h2>
-        <div class="strip">
-          <article class="tile">
-            <p class="idx">01</p>
-            <h3>Notes</h3>
-            <p>Title, markdown, and a live preview. Search never leaves the phone.</p>
-          </article>
-          <article class="tile">
-            <p class="idx">02</p>
-            <h3>Agenda</h3>
-            <p>Alarms, reminders, and events from a week out to a year.</p>
-          </article>
-          <article class="tile">
-            <p class="idx">03</p>
-            <h3>Confirm</h3>
-            <p>WhatsApp, Signal, and X open a draft. You tap Send, or say send.</p>
-          </article>
-          <article class="tile">
-            <p class="idx">04</p>
-            <h3>Two languages</h3>
-            <p>English or Spanish for the interface, speech, and spoken replies.</p>
-          </article>
-          <article class="tile">
-            <p class="idx">05</p>
-            <h3>A lighter brain</h3>
-            <p>Start with a small on-device model. Heavier ones stay optional.</p>
-          </article>
+      <aside class="window side-window" aria-hidden="true">
+        <div class="titlebar">
+          <span class="close"></span>
+          <p>Finder</p>
+          <span class="stripes"></span>
         </div>
-      </section>
+        <ul class="files">
+          <li>Notes</li>
+          <li>Agenda</li>
+          <li>Confirm</li>
+          <li>English / Español</li>
+          <li>0.5B model</li>
+        </ul>
+      </aside>
 
-      <section class="section reveal">
-        <p class="kicker">In hand</p>
-        <h2>Talk, then it answers.</h2>
-        <aside class="phone">
-          <div class="phone-bezel"><div class="phone-notch"></div></div>
-          <div class="phone-grid">
-            <div class="mini">
-              <p class="kicker">You</p>
-              <p class="swap">
-                <span>Remind me tomorrow at nine</span>
-                <span>Anota comprar café</span>
-              </p>
-            </div>
-            <div class="mini">
-              <p class="kicker">Assistant</p>
-              <p class="swap">
-                <span>I will remind you tomorrow at 9:00.</span>
-                <span>Nota guardada.</span>
-              </p>
-            </div>
+      <section class="window chat-window">
+        <div class="titlebar">
+          <span class="close" aria-hidden="true"></span>
+          <p>Conversation</p>
+          <span class="stripes" aria-hidden="true"></span>
+        </div>
+        <div class="chat">
+          <div class="pair fade-a">
+            <p class="you">You: Remind me tomorrow at nine</p>
+            <p class="bot">Assistant: I will remind you tomorrow at 9:00.</p>
           </div>
-        </aside>
+          <div class="pair fade-b">
+            <p class="you">You: Anota comprar café</p>
+            <p class="bot">Assistant: Nota guardada.</p>
+          </div>
+        </div>
       </section>
+    </main>
 
-      <section class="seal reveal">
-        <p class="kicker">Free, and sealed</p>
-        <p>
-          No subscription. No cloud account. Speech recognition and the language
-          model run on this device. Notes, reminders, alarms, and remembered
-          facts live in a local database. The only network use is the model
-          download you start yourself.
-        </p>
-      </section>
-
-      <footer class="foot">
-        <span>Assistant 1.5.0 · Android 8+ · Free</span>
-        <a href="https://github.com/Gabo-Tech/pesonalassistant">Source on GitHub</a>
-      </footer>
-    </div>
+    <footer class="foot">Assistant 1.6.0 · Android 8+ · Free</footer>
 
     <script>
       (function () {
@@ -140,38 +96,19 @@
         ];
         var el = document.getElementById("transcript");
         var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        var reveals = document.querySelectorAll(".reveal");
-
-        if (reduce || !("IntersectionObserver" in window)) {
-          reveals.forEach(function (node) {
-            node.classList.add("in");
-          });
-        } else {
-          var io = new IntersectionObserver(
-            function (entries) {
-              entries.forEach(function (entry) {
-                if (!entry.isIntersecting) return;
-                entry.target.classList.add("in");
-                io.unobserve(entry.target);
-              });
-            },
-            { threshold: 0.16 }
-          );
-          reveals.forEach(function (node) {
-            io.observe(node);
-          });
-        }
-
         if (!el || reduce) {
           if (el) el.textContent = lines[2];
           return;
         }
-
         var i = 0;
         setInterval(function () {
-          i = (i + 1) % lines.length;
-          el.textContent = lines[i];
-        }, 2200);
+          el.classList.add("out");
+          setTimeout(function () {
+            i = (i + 1) % lines.length;
+            el.textContent = lines[i];
+            el.classList.remove("out");
+          }, 280);
+        }, 2400);
       })();
     </script>
   </body>

@@ -55,7 +55,7 @@ export async function loadLlm(modelPath: string): Promise<void> {
           model: modelPath,
           // 2048 tokens is plenty for a short command plus a few turns of history,
           // and keeps the KV cache small enough for a phone.
-          n_ctx: 2048,
+          n_ctx: 1024,
           n_threads: 4,
           // Android GPU offload via OpenCL is still unreliable across vendors; CPU is
           // predictable and a 1.5B Q4 model is fast enough for one-shot commands.
@@ -118,9 +118,9 @@ export async function ask(userText: string): Promise<AssistantReply> {
       json_schema: { strict: true, schema: REPLY_SCHEMA as unknown as object },
     },
     // Low but non-zero: deterministic enough to follow the format, not robotic.
-    temperature: 0.3,
+    temperature: 0.1,
     top_p: 0.9,
-    n_predict: 256,
+    n_predict: 128,
   });
 
   return parseReply(result.text || result.content || '');

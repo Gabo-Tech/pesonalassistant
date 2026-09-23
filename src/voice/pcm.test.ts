@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { decodePcm, looksLikeMisreadInt16, peakNormalize } from './pcm.ts';
+import { decodePcm, floatToPcm16, looksLikeMisreadInt16, peakNormalize } from './pcm.ts';
 
 describe('decodePcm', () => {
   it('keeps native float32 samples', () => {
@@ -28,6 +28,16 @@ describe('decodePcm', () => {
     const out = decodePcm(src.buffer, 'float32');
     assert.equal(out.length, src.length);
     assert.ok(Math.abs(out[0] - 12000 / 32768) < 0.01);
+  });
+});
+
+describe('floatToPcm16', () => {
+  it('writes one little-endian int16 sample per float', () => {
+    const buffer = floatToPcm16(new Float32Array([0.5, -1]));
+    const view = new Int16Array(buffer);
+    assert.equal(buffer.byteLength, 4);
+    assert.ok(Math.abs(view[0] - 16383) <= 1);
+    assert.equal(view[1], -32768);
   });
 });
 

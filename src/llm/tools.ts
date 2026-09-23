@@ -29,6 +29,7 @@ export const TOOL_NAMES = [
   'draft_whatsapp',
   'draft_signal',
   'draft_tweet',
+  'web_search',
 ] as const;
 
 export type ToolName = (typeof TOOL_NAMES)[number];

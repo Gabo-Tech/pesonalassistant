@@ -26,7 +26,7 @@ export const es: { [K in keyof typeof en]: string } = {
   'home.composer': 'Escribe un comando si prefieres no hablar',
   'home.go': 'Ir',
   'home.privacy':
-    'La voz y el razonamiento corren en este teléfono. No se envía nada hasta que confirmes.',
+    'La voz y el razonamiento corren en este teléfono. Una búsqueda de datos actuales envía solo esa consulta. Nada más sale hasta que confirmes.',
   'home.notice': 'Aviso',
   'home.openSettings': 'Abrir ajustes',
   'home.needsModels':
@@ -51,6 +51,9 @@ export const es: { [K in keyof typeof en]: string } = {
   'stt.off': 'Toca el orbe para hablar',
   'stt.englishOnly':
     'Este modelo de voz es solo inglés. Descarga Whisper multilingüe en Ajustes para el español.',
+  'search.looking': 'Buscando.',
+  'search.empty': 'No lo encontré en internet.',
+  'search.failed': 'La búsqueda no terminó.',
   'stt.cantHear':
     'No te oigo. Acércate, o sube la sensibilidad del micrófono en Ajustes.',
   'stt.missed': 'No te entendí. Prueba otra vez.',
@@ -171,7 +174,7 @@ export const es: { [K in keyof typeof en]: string } = {
     'Aunque el auto-pulsar esté activo, no se envía nada hasta que confirmes, y solo un mensaje cada vez.',
   'settings.privacy': 'Privacidad',
   'settings.privacyHint':
-    'El reconocimiento de voz y el modelo de lenguaje corren en este dispositivo. Notas, recordatorios y hechos se guardan en una base local. No se sube nada.',
+    'El reconocimiento de voz y el modelo de lenguaje corren en este dispositivo. Notas, recordatorios y hechos se guardan en una base local. Una búsqueda de datos actuales envía solo esa consulta. No se sube nada más.',
   'settings.download': 'Descargar',
   'settings.import': 'Importar desde Archivos',
   'settings.loaded': 'Cargado',

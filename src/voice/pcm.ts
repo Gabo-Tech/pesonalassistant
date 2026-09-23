@@ -36,6 +36,20 @@ export function looksLikeMisreadInt16(samples: Float32Array): boolean {
   return wild / n > 0.25;
 }
 
+/**
+ * whisper.rn's transcribeData reads the ArrayBuffer as signed 16-bit PCM.
+ * Float32 bytes are interpreted as noise, so the model never hears the utterance.
+ */
+export function floatToPcm16(samples: Float32Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(samples.length * 2);
+  const view = new Int16Array(buffer);
+  for (let i = 0; i < samples.length; i += 1) {
+    const sample = Math.max(-1, Math.min(1, samples[i]));
+    view[i] = sample < 0 ? Math.round(sample * 32768) : Math.round(sample * 32767);
+  }
+  return buffer;
+}
+
 export function int16ToFloat(data: ArrayBuffer): Float32Array {
   const src = new Int16Array(data);
   const out = new Float32Array(src.length);
