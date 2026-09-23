@@ -2,6 +2,11 @@ import { deleteEvent, createEvent, listEvents } from '../calendar/events';
 import { alarmSearchText, cancelAlarm, createAlarm, listAlarms } from '../db/alarms';
 import { deleteFactByTitle, listFacts, upsertFact } from '../db/facts';
 import { forgetFactQuery, pickFactToForget, rememberFactInput } from '../db/factsFormat';
+import {
+  createLocalEvent,
+  deleteLocalEvent,
+  listLocalEvents,
+} from '../db/localEvents';
 import { appendToNote, createNote, deleteNote, searchNotes } from '../db/notes';
 import { completeReminder, createReminder, deleteReminder, listReminders } from '../db/reminders';
 import { t } from '../i18n';
@@ -32,6 +37,10 @@ function loc(): string {
 
 function whenLabel(ms: number): string {
   return formatWhen(ms, loc());
+}
+
+function usesPhoneCalendar(): boolean {
+  return peekSettings().calendarMode === 'phone';
 }
 
 function clockLabel(hour: number, minute: number): string {
@@ -260,7 +269,11 @@ export async function routeAction(
           speech: t('router.eventSpeech', { title, when: label }),
           confirmLabel: t('common.create'),
           execute: async () => {
-            await createEvent({ title, start: when.at, end: when.at + minutes * 60_000 });
+            if (usesPhoneCalendar()) {
+              await createEvent({ title, start: when.at, end: when.at + minutes * 60_000 });
+            } else {
+              await createLocalEvent({ title, start: when.at, end: when.at + minutes * 60_000 });
+            }
             return t('router.eventAdded', { title, when: label });
           },
         },
@@ -274,8 +287,16 @@ export async function routeAction(
       const dayStart = new Date(from);
       dayStart.setHours(0, 0, 0, 0);
       const dayEnd = new Date(dayStart.getTime() + 86_400_000);
+      const fromMs = dayStart.getTime();
+      const toMs = dayEnd.getTime();
 
-      const events = await listEvents(dayStart.getTime(), dayEnd.getTime());
+      const events = usesPhoneCalendar()
+        ? await listEvents(fromMs, toMs)
+        : (await listLocalEvents(fromMs, toMs)).map((row) => ({
+            id: String(row.id),
+            title: row.title,
+            start: row.start_at,
+          }));
       if (events.length === 0) return ok(t('router.nothingCalendar'));
       return ok(
         t('router.eventsList', {
@@ -293,10 +314,16 @@ export async function routeAction(
       const query = action.title?.trim() || action.query?.trim() || action.text?.trim() || '';
       if (!query) return ok(t('router.whichEvent'));
       const now = Date.now();
-      const events = await listEvents(now, now + 30 * 86_400_000);
+      const events = usesPhoneCalendar()
+        ? await listEvents(now, now + 30 * 86_400_000)
+        : (await listLocalEvents(now, now + 30 * 86_400_000)).map((row) => ({
+            id: String(row.id),
+            title: row.title,
+          }));
       const match = findUniqueMatch(events, query, (event) => event.title);
       if (!match) return ok(t('router.whichEvent'));
-      await deleteEvent(match.id);
+      if (usesPhoneCalendar()) await deleteEvent(match.id);
+      else await deleteLocalEvent(Number(match.id));
       return ok(t('router.eventDeleted'));
     }
 

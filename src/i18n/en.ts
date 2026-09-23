@@ -49,6 +49,7 @@ export const en = {
   'stt.off': 'Tap the orb to talk',
   'stt.englishOnly':
     'This speech model is English-only. Download multilingual Whisper in Settings for Spanish.',
+  'stt.micSilent': 'The microphone is open, but no sound is arriving.',
   'search.looking': 'Looking that up.',
   'search.empty': 'I could not find that online.',
   'search.failed': 'The search did not finish.',
@@ -144,6 +145,9 @@ export const en = {
   'settings.wakeDetect':
     'Detected by transcribing short bursts of audio on-device. No account needed.',
   'settings.calendar': 'Calendar',
+  'settings.calendarModeHint': 'Events can stay in this app, or be written to a phone calendar.',
+  'settings.calendarApp': 'In this app',
+  'settings.calendarPhone': 'Phone calendar',
   'settings.calendarNeed': 'Calendar permission is needed to create and list events.',
   'settings.calendarGrant': 'Grant calendar access',
   'settings.calendarNone': 'No writable calendars on this device.',
@@ -202,6 +206,8 @@ export const en = {
   'onboarding.modelsTitle': 'Voice on this phone',
   'onboarding.modelsBody':
     'Download speech and the language model once ({size}). This is the only time the app uses the network. Typed commands work if you skip.',
+  'onboarding.forThisPhone': 'For this phone: {ram}',
+  'onboarding.heavierOptional': 'Optional heavier model: {name}',
   'onboarding.download': 'Download',
   'onboarding.skip': 'Skip for now',
   'onboarding.speech': 'Speech',

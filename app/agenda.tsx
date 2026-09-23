@@ -12,6 +12,12 @@ import {
 import { EVENT_HORIZONS, horizonRange, type EventHorizonId } from '../src/calendar/range';
 import { cancelAlarm, createAlarm, listAlarms, updateAlarm, type Alarm } from '../src/db/alarms';
 import {
+  createLocalEvent,
+  deleteLocalEvent,
+  listLocalEvents,
+  updateLocalEvent,
+} from '../src/db/localEvents';
+import {
   completeReminder,
   createReminder,
   deleteReminder,
@@ -50,6 +56,23 @@ export default function AgendaScreen() {
   const refresh = useCallback(async () => {
     setAlarms(await listAlarms());
     setReminders(await listReminders());
+    const range = horizonRange(horizon);
+
+    if (settings.calendarMode !== 'phone') {
+      setCalendarDenied(false);
+      const rows = await listLocalEvents(range.from, range.to);
+      setEvents(
+        rows.map((row) => ({
+          id: String(row.id),
+          title: row.title,
+          start: row.start_at,
+          end: row.end_at,
+          allDay: row.all_day === 1,
+          location: row.location || undefined,
+        })),
+      );
+      return;
+    }
 
     const granted = await ensureCalendarPermission();
     setCalendarDenied(!granted);
@@ -58,9 +81,8 @@ export default function AgendaScreen() {
       return;
     }
 
-    const range = horizonRange(horizon);
     setEvents(await listEvents(range.from, range.to));
-  }, [horizon]);
+  }, [horizon, settings.calendarMode]);
 
   useFocusEffect(
     useCallback(() => {
@@ -124,19 +146,27 @@ export default function AgendaScreen() {
     const minutes = Number(eventDraft.minutes) || 60;
     const title = eventDraft.title.trim();
     if (!title) return;
-    if (eventDraft.id) {
+    const end = start + minutes * 60_000;
+    const location = eventDraft.location.trim();
+    if (settings.calendarMode !== 'phone') {
+      if (eventDraft.id) {
+        await updateLocalEvent(Number(eventDraft.id), { title, start, end, location });
+      } else {
+        await createLocalEvent({ title, start, end, location });
+      }
+    } else if (eventDraft.id) {
       await updateEvent(eventDraft.id, {
         title,
         start,
-        end: start + minutes * 60_000,
-        location: eventDraft.location.trim() || undefined,
+        end,
+        location: location || undefined,
       });
     } else {
       await createEvent({
         title,
         start,
-        end: start + minutes * 60_000,
-        location: eventDraft.location.trim() || undefined,
+        end,
+        location: location || undefined,
       });
     }
     setEventDraft(null);
@@ -385,7 +415,13 @@ export default function AgendaScreen() {
                 {
                   text: tr('common.delete'),
                   style: 'destructive',
-                  onPress: () => void deleteEvent(event.id).then(refresh),
+                  onPress: () => {
+                    const remove =
+                      settings.calendarMode === 'phone'
+                        ? deleteEvent(event.id)
+                        : deleteLocalEvent(Number(event.id));
+                    void remove.then(refresh);
+                  },
                 },
               ]);
             }}

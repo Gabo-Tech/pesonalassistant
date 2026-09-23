@@ -26,6 +26,8 @@ export type Settings = {
   sttModelPath: string | null;
   /** Android calendar chosen for new events. */
   calendarId: string | null;
+  /** In-app events, or the phone calendar when the user opts in. */
+  calendarMode: 'app' | 'phone';
   /** Whether the user opted into the Accessibility auto-tap-send service. */
   sendCrawlerEnabled: boolean;
   /** Japandi UI. Dark is the product default, independent of the OS scheme. */
@@ -54,6 +56,7 @@ export const DEFAULT_SETTINGS: Settings = {
   llmModelPath: null,
   sttModelPath: null,
   calendarId: null,
+  calendarMode: 'app',
   sendCrawlerEnabled: false,
   appearance: 'dark',
   onboardingComplete: false,

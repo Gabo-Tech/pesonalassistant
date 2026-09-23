@@ -7,16 +7,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { requestRecordingPermissionsAsync } from 'expo-audio';
+import * as Device from 'expo-device';
 import { loadLlm } from '../llm/engine';
 import {
+  MODELS,
   downloadModel,
   formatBytes,
   isDownloaded,
   localPath,
-  recommendedStt,
-  recommendedLlm,
   type ModelSpec,
 } from '../models/catalog';
+import { recommendForRam } from '../models/devicePick';
 import { prepareNotifications } from '../notify';
 import { useSettings } from '../settings/store';
 import { useT } from '../i18n';
@@ -25,9 +26,8 @@ import { Bento, BentoLabel, Chip, GUTTER, InkSwitch, PAGE_MARGIN } from '../ui/B
 import { useTheme } from '../ui/ThemeProvider';
 import { Body, Display, Meta } from '../ui/Type';
 import { loadStt } from '../voice/stt';
+import { listTtsVoices } from '../voice/tts';
 import { useVoice } from '../voice/VoiceProvider';
-
-const RECOMMENDED_LLM = recommendedLlm();
 
 /**
  * First launch only. Four steps, one job each. Skip is allowed: typed commands
@@ -46,7 +46,22 @@ export function Onboarding() {
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [ram, setRam] = useState<number | null>(null);
   const cancelRef = useRef<(() => void) | null>(null);
+  const pick = recommendForRam(ram, settings.locale);
+  const sttPick = MODELS.find((model) => model.id === pick.sttId)!;
+  const llmPick = MODELS.find((model) => model.id === pick.llmId)!;
+  const heavier = pick.heavierLlmId
+    ? MODELS.find((model) => model.id === pick.heavierLlmId)
+    : null;
+
+  useEffect(() => {
+    setRam(Device.totalMemory);
+    void listTtsVoices().then((voices) => {
+      const neural = voices.find((voice) => voice.neural) ?? voices[0];
+      if (neural) void updateSettings({ ttsVoiceId: neural.identifier });
+    });
+  }, [settings.locale, updateSettings]);
 
   useEffect(
     () => () => {
@@ -81,8 +96,8 @@ export function Onboarding() {
     setError(null);
     setBusy(true);
     setProgress(0);
-    const sttSpec = recommendedStt(settings.locale);
-    const pairBytes = sttSpec.bytes + RECOMMENDED_LLM.bytes;
+    const sttSpec = sttPick;
+    const pairBytes = sttSpec.bytes + llmPick.bytes;
 
     const run = async (spec: ModelSpec, offset: number, weight: number) => {
       if (isDownloaded(spec)) {
@@ -107,9 +122,9 @@ export function Onboarding() {
 
       setPhase(tr('onboarding.llm'));
       const llmUri = await run(
-        RECOMMENDED_LLM,
+        llmPick,
         sttSpec.bytes / pairBytes,
-        RECOMMENDED_LLM.bytes / pairBytes,
+        llmPick.bytes / pairBytes,
       );
       await loadLlm(llmUri);
       await updateSettings({ llmModelPath: llmUri });
@@ -124,7 +139,7 @@ export function Onboarding() {
       setBusy(false);
       setPhase(null);
     }
-  }, [alwaysListen, finish, settings.locale, tr, updateSettings, wakeWord]);
+  }, [alwaysListen, finish, llmPick, settings.locale, sttPick, tr, updateSettings, wakeWord]);
 
   const skip = useCallback(async () => {
     cancelRef.current?.();
@@ -134,8 +149,7 @@ export function Onboarding() {
     });
   }, [alwaysListen, finish, settings.locale, wakeWord]);
 
-  const sttSpec = recommendedStt(settings.locale);
-  const pairBytes = sttSpec.bytes + RECOMMENDED_LLM.bytes;
+  const pairBytes = sttPick.bytes + llmPick.bytes;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: t.bg }]}>
@@ -231,9 +245,16 @@ export function Onboarding() {
               {tr('onboarding.modelsBody', { size: formatBytes(pairBytes) })}
             </Body>
             <Body style={{ marginTop: 12 }}>
-              {sttSpec.label}
+              {tr('onboarding.forThisPhone', {
+                ram: ram ? formatBytes(ram) : '…',
+              })}
               {'\n'}
-              {RECOMMENDED_LLM.label}
+              {sttPick.label}
+              {'\n'}
+              {llmPick.label}
+              {heavier
+                ? `\n${tr('onboarding.heavierOptional', { name: heavier.label })}`
+                : ''}
             </Body>
             {busy && (
               <View style={{ gap: 8, marginTop: 16 }}>

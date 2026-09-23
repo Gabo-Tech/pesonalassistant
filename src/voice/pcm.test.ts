@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { decodePcm, floatToPcm16, looksLikeMisreadInt16, peakNormalize } from './pcm.ts';
+import { decodePcm, floatToPcm16, peakNormalize } from './pcm.ts';
 
 describe('decodePcm', () => {
   it('keeps native float32 samples', () => {
@@ -20,14 +20,11 @@ describe('decodePcm', () => {
     assert.equal(out[2], -1);
   });
 
-  it('detects int16 bytes mislabeled as float32', () => {
-    const src = new Int16Array(64);
-    for (let i = 0; i < src.length; i += 1) src[i] = i % 2 === 0 ? 12000 : -8000;
-    const asFloat = new Float32Array(src.buffer);
-    assert.equal(looksLikeMisreadInt16(asFloat), true);
+  it('keeps aligned float32 even when samples look loud', () => {
+    const src = new Float32Array([4, -3, 2, 1]);
     const out = decodePcm(src.buffer, 'float32');
-    assert.equal(out.length, src.length);
-    assert.ok(Math.abs(out[0] - 12000 / 32768) < 0.01);
+    assert.equal(out.length, 4);
+    assert.equal(out[0], 4);
   });
 });
 

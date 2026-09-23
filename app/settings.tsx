@@ -189,28 +189,43 @@ export default function SettingsScreen() {
       </Section>
 
       <Section title={tr('settings.calendar')}>
-        {calendarDenied ? (
-          <>
-            <Body style={{ color: t.dim }}>{tr('settings.calendarNeed')}</Body>
-            <InkButton label={tr('settings.calendarGrant')} onPress={() => void loadCalendars(true)} />
-          </>
-        ) : calendars.length === 0 ? (
-          <Body style={{ color: t.dim }}>{tr('settings.calendarNone')}</Body>
-        ) : (
-          <>
-            <Body style={{ color: t.dim }}>{tr('settings.calendarPick')}</Body>
-            <View style={styles.chipRow}>
-              {calendars.map((calendar) => (
-                <Chip
-                  key={calendar.id}
-                  label={calendar.title}
-                  active={settings.calendarId === calendar.id}
-                  onPress={() => void updateSettings({ calendarId: calendar.id })}
-                />
-              ))}
-            </View>
-          </>
-        )}
+        <Body style={{ color: t.dim }}>{tr('settings.calendarModeHint')}</Body>
+        <View style={styles.chipRow}>
+          <Chip
+            label={tr('settings.calendarApp')}
+            active={settings.calendarMode !== 'phone'}
+            onPress={() => void updateSettings({ calendarMode: 'app' })}
+          />
+          <Chip
+            label={tr('settings.calendarPhone')}
+            active={settings.calendarMode === 'phone'}
+            onPress={() => void updateSettings({ calendarMode: 'phone' })}
+          />
+        </View>
+        {settings.calendarMode === 'phone' ? (
+          calendarDenied ? (
+            <>
+              <Body style={{ color: t.dim }}>{tr('settings.calendarNeed')}</Body>
+              <InkButton label={tr('settings.calendarGrant')} onPress={() => void loadCalendars(true)} />
+            </>
+          ) : calendars.length === 0 ? (
+            <Body style={{ color: t.dim }}>{tr('settings.calendarNone')}</Body>
+          ) : (
+            <>
+              <Body style={{ color: t.dim }}>{tr('settings.calendarPick')}</Body>
+              <View style={styles.chipRow}>
+                {calendars.map((calendar) => (
+                  <Chip
+                    key={calendar.id}
+                    label={calendar.title}
+                    active={settings.calendarId === calendar.id}
+                    onPress={() => void updateSettings({ calendarId: calendar.id })}
+                  />
+                ))}
+              </View>
+            </>
+          )
+        ) : null}
       </Section>
 
       <Section title={tr('settings.memory')}>

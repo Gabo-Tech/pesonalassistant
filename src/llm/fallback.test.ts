@@ -63,6 +63,14 @@ describe('fallbackAsk', () => {
     assert.match(reply.action?.text ?? '', /running late/i);
   });
 
+  it('creates an event from a spoken line', () => {
+    const reply = fallbackAsk('add an event dentist tomorrow at 9');
+    assert.equal(reply.action?.tool, 'create_event');
+    assert.match(reply.action?.title ?? '', /dentist/i);
+    const spanish = fallbackAsk('añade dentista al calendario', 'es');
+    assert.equal(spanish.action?.tool, 'create_event');
+  });
+
   it('explains itself when it does not understand', () => {
     const reply = fallbackAsk('what is the meaning of life');
     assert.equal(reply.action, undefined);

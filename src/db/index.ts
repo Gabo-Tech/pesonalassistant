@@ -7,7 +7,7 @@ const DB_NAME = 'assistant.db';
  * `PRAGMA user_version`, so the app can upgrade an existing phone database in
  * place instead of wiping the user's notes.
  */
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
@@ -96,6 +96,23 @@ async function migrate(db: SQLite.SQLiteDatabase): Promise<void> {
     // Title has existed since v1; this only speeds list/search on existing phones.
     await db.execAsync('CREATE INDEX IF NOT EXISTS notes_updated_idx ON notes (updated_at DESC);');
     version = 4;
+  }
+
+  if (version === 4) {
+    await db.execAsync(`
+      CREATE TABLE local_events (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        title      TEXT NOT NULL,
+        start_at   INTEGER NOT NULL,
+        end_at     INTEGER NOT NULL,
+        location   TEXT NOT NULL DEFAULT '',
+        all_day    INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE INDEX local_events_start_idx ON local_events (start_at);
+    `);
+    version = 5;
   }
 
   await db.execAsync(`PRAGMA user_version = ${version}`);

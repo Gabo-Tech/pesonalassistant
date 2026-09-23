@@ -16,8 +16,9 @@ export function decodePcm(data: ArrayBuffer, encoding?: string | null): Float32A
 
 function shouldReadAsInt16(data: ArrayBuffer, encoding?: string | null): boolean {
   if (encoding === 'float32') {
-    if (data.byteLength % 4 !== 0) return data.byteLength % 2 === 0;
-    return looksLikeMisreadInt16(new Float32Array(data));
+    // A 4-byte-aligned buffer was requested as float32. Reinterpreting it as int16
+    // turns real speech into silence.
+    return data.byteLength % 4 !== 0 && data.byteLength % 2 === 0;
   }
   if (encoding === 'int16') return true;
   if (data.byteLength % 4 !== 0) return data.byteLength % 2 === 0;

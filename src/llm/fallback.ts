@@ -14,7 +14,7 @@ function say(locale: Locale, english: string, spanish: string): string {
 
 const remembered = (locale: Locale) => say(locale, 'I will remember that.', 'Lo recordaré.');
 
-export function fallbackAsk(userText: string, locale: Locale = 'en'): AssistantReply {
+export function matchCommand(userText: string, locale: Locale = 'en'): AssistantReply | null {
   const text = userText.trim();
   const lower = text.toLowerCase();
 
@@ -111,6 +111,15 @@ export function fallbackAsk(userText: string, locale: Locale = 'en'): AssistantR
     };
   }
 
+  const bareNote = lower.match(/^(?:note|save a note)\s+(?!that\b)(.+)/i);
+  if (bareNote) {
+    const body = text.slice(text.length - bareNote[1].length);
+    return {
+      say: say(locale, `Saved note "${body.slice(0, 80)}".`, `Nota guardada "${body.slice(0, 80)}".`),
+      action: { tool: 'create_note', title: body.slice(0, 80), text: body },
+    };
+  }
+
   const anota = lower.match(/^(?:anota(?: que)?|apunta(?: que)?|toma nota(?: de)?)\s+(.+)/i);
   if (anota) {
     const body = text.slice(text.length - anota[1].length);
@@ -179,6 +188,12 @@ export function fallbackAsk(userText: string, locale: Locale = 'en'): AssistantR
     return eventReply(text, evento[1], locale);
   }
 
+  const calendarLine = lower.match(/^(?:add|put)\s+(.+?)\s+(?:on|to)\s+(?:my\s+)?(?:calendar|agenda)$/i);
+  if (calendarLine) return eventReply(text, calendarLine[1], locale);
+
+  const calendario = lower.match(/^(?:a[nñ]ade|agrega)\s+(.+?)\s+al calendario$/i);
+  if (calendario) return eventReply(text, calendario[1], locale);
+
   if (
     /\b(what(?:'s| is) on my (?:calendar|agenda)|list events|any events)\b/.test(lower) ||
     /\b(qu[eé] hay(?: ma[nñ]ana)?|qu[eé] hay en el calendario|lista eventos)\b/.test(lower)
@@ -238,13 +253,19 @@ export function fallbackAsk(userText: string, locale: Locale = 'en'): AssistantR
     };
   }
 
-  return {
-    say: say(
-      locale,
-      'No on-device model is loaded yet. Download one in Settings, or try: "note that …", "set an alarm for 7am", "remind me to … tomorrow at 9", "WhatsApp Marie I\'m late", "tweet …".',
-      'Aún no hay un modelo en el teléfono. Descárgalo en Ajustes, o prueba: "anota que …", "pon una alarma a las 7", "recuérdame … mañana a las 9", "WhatsApp a Marie llego tarde".',
-    ),
-  };
+  return null;
+}
+
+export function fallbackAsk(userText: string, locale: Locale = 'en'): AssistantReply {
+  return (
+    matchCommand(userText, locale) ?? {
+      say: say(
+        locale,
+        'No on-device model is loaded yet. Download one in Settings, or try: "note that …", "set an alarm for 7am", "remind me to … tomorrow at 9", "WhatsApp Marie I\'m late", "tweet …".',
+        'Aún no hay un modelo en el teléfono. Descárgalo en Ajustes, o prueba: "anota que …", "pon una alarma a las 7", "recuérdame … mañana a las 9", "WhatsApp a Marie llego tarde".',
+      ),
+    }
+  );
 }
 
 function reminderReply(_text: string, rest: string, locale: Locale): AssistantReply {

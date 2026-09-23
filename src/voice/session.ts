@@ -158,6 +158,12 @@ class VoiceSession {
     }
   }
 
+  /** The capture is open, but no PCM has arrived. Stay in listening. */
+  reportMicSilent(): void {
+    if (this.snapshot.state !== 'listening') return;
+    this.update({ error: t('stt.micSilent') });
+  }
+
   pushAudio(samples: Float32Array, sampleRate: number): void {
     if (this.isDeaf()) return;
     this.vad.push(samples, sampleRate);

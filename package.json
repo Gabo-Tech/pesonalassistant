@@ -1,6 +1,6 @@
 {
   "name": "pesonalassistant",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
@@ -13,6 +13,7 @@
     "expo-calendar": "~57.0.4",
     "expo-constants": "~57.0.19",
     "expo-dev-client": "~57.0.19",
+    "expo-device": "~57.0.2",
     "expo-document-picker": "~57.0.2",
     "expo-file-system": "~57.0.7",
     "expo-intent-launcher": "~57.0.1",
@@ -41,7 +42,7 @@
     "prebuild": "expo prebuild --platform android",
     "prebuild:clean": "expo prebuild --platform android --clean",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --experimental-strip-types src/voice/wake.test.ts src/voice/sessionLogic.test.ts src/voice/voices.test.ts src/voice/sttLanguage.test.ts src/voice/pcm.test.ts src/share/confirmGate.test.ts src/llm/time.test.ts src/llm/fallback.test.ts src/llm/match.test.ts src/llm/noteIntent.test.ts src/search/web.test.ts src/db/factsFormat.test.ts src/llm/facts.test.ts src/notes/title.test.ts src/calendar/range.test.ts src/i18n/index.test.ts src/models/recommend.test.ts",
+    "test": "node --test --experimental-strip-types src/voice/wake.test.ts src/voice/sessionLogic.test.ts src/voice/voices.test.ts src/voice/sttLanguage.test.ts src/voice/pcm.test.ts src/share/confirmGate.test.ts src/llm/time.test.ts src/llm/fallback.test.ts src/llm/match.test.ts src/llm/noteIntent.test.ts src/search/web.test.ts src/db/factsFormat.test.ts src/llm/facts.test.ts src/notes/title.test.ts src/calendar/range.test.ts src/i18n/index.test.ts src/models/recommend.test.ts src/models/devicePick.test.ts",
     "apk": "cd android && ./gradlew assembleRelease"
   },
   "private": true

@@ -55,12 +55,15 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
+  const heardBuffer = useRef(false);
+
   const { stream, isStreaming } = useAudioStream({
     sampleRate: WHISPER_SAMPLE_RATE,
     channels: 1,
     encoding: 'float32',
     onBuffer: (buffer) => {
-      const pcm = decodePcm(buffer.data);
+      heardBuffer.current = true;
+      const pcm = decodePcm(buffer.data, 'float32');
       const resampled = resampleTo16k(pcm, buffer.sampleRate);
       voiceSession.pushAudio(resampled, WHISPER_SAMPLE_RATE);
     },
@@ -105,21 +108,26 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 
   const remicForListen = useCallback(async () => {
     await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-    if (wantStream.current) {
-      stream.stop();
-      wantStream.current = false;
-    }
+    if (wantStream.current) return;
     await startStreamRef.current();
-  }, [stream]);
+  }, []);
 
-  // TTS can steal the recording session. Re-arm the mic when we start listening again.
+  // TTS can steal the recording session. Re-apply the audio mode without
+  // restarting a stream that is already delivering buffers.
   useEffect(() => {
     const state = snapshot.state;
     const entered =
       (state === 'listening' || state === 'confirming') && lastListenState.current !== state;
     lastListenState.current = state;
     if (!entered) return;
+    heardBuffer.current = false;
     void remicForListen();
+    const timer = setTimeout(() => {
+      if (!heardBuffer.current && voiceSession.getSnapshot().state === 'listening') {
+        voiceSession.reportMicSilent();
+      }
+    }, 2000);
+    return () => clearTimeout(timer);
   }, [remicForListen, snapshot.state]);
 
   const setListening = useCallback(

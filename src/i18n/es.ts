@@ -51,6 +51,7 @@ export const es: { [K in keyof typeof en]: string } = {
   'stt.off': 'Toca el orbe para hablar',
   'stt.englishOnly':
     'Este modelo de voz es solo inglés. Descarga Whisper multilingüe en Ajustes para el español.',
+  'stt.micSilent': 'El micrófono está abierto, pero no llega sonido.',
   'search.looking': 'Buscando.',
   'search.empty': 'No lo encontré en internet.',
   'search.failed': 'La búsqueda no terminó.',
@@ -146,6 +147,9 @@ export const es: { [K in keyof typeof en]: string } = {
   'settings.wakeDetect':
     'Se detecta transcribiendo ráfagas cortas de audio en el dispositivo. No hace falta cuenta.',
   'settings.calendar': 'Calendario',
+  'settings.calendarModeHint': 'Los eventos pueden quedarse en esta app, o escribirse en un calendario del teléfono.',
+  'settings.calendarApp': 'En esta app',
+  'settings.calendarPhone': 'Calendario del teléfono',
   'settings.calendarNeed': 'Hace falta permiso de calendario para crear y listar eventos.',
   'settings.calendarGrant': 'Conceder acceso al calendario',
   'settings.calendarNone': 'No hay calendarios editables en este dispositivo.',
@@ -205,6 +209,8 @@ export const es: { [K in keyof typeof en]: string } = {
   'onboarding.modelsTitle': 'Voz en este teléfono',
   'onboarding.modelsBody':
     'Descarga la voz y el modelo de lenguaje una vez ({size}). Esta es la única vez que la app usa la red. Los comandos escritos funcionan si omites.',
+  'onboarding.forThisPhone': 'Para este teléfono: {ram}',
+  'onboarding.heavierOptional': 'Modelo más pesado, opcional: {name}',
   'onboarding.download': 'Descargar',
   'onboarding.skip': 'Omitir por ahora',
   'onboarding.speech': 'Voz',

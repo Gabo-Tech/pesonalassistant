@@ -22,3 +22,8 @@ export function horizonRange(
   const spec = EVENT_HORIZONS.find((item) => item.id === id) ?? EVENT_HORIZONS[0];
   return { from: now, to: now + spec.days * DAY_MS, days: spec.days };
 }
+
+/** Same window as the in-app calendar query: start before `to`, end after `from`. */
+export function eventOverlaps(start: number, end: number, from: number, to: number): boolean {
+  return start < to && end > from;
+}
