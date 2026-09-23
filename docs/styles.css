@@ -25,9 +25,10 @@ a {
 .menubar {
   display: flex;
   align-items: center;
-  gap: 18px;
-  height: 28px;
-  padding: 0 12px;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  min-height: 28px;
+  padding: 8px 12px;
   background: var(--bar);
   border-bottom: 3px solid var(--ink);
   font-size: 14px;
@@ -59,10 +60,12 @@ a {
 
 .desktop {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   max-width: 1080px;
-  min-height: calc(100vh - 64px);
   margin: 0 auto;
-  padding: 36px 24px 48px;
+  padding: 16px 16px 32px;
 }
 
 .window {
@@ -123,13 +126,13 @@ a {
 }
 
 .hero-window {
-  width: min(640px, 100%);
+  width: 100%;
   position: relative;
   z-index: 2;
 }
 
 .window-body {
-  padding: 22px 22px 26px;
+  padding: 16px;
 }
 
 .kicker {
@@ -139,7 +142,7 @@ a {
 }
 
 .headline {
-  font-size: 40px;
+  font-size: 32px;
   line-height: 1.05;
   font-weight: 700;
   margin: 10px 0 12px;
@@ -160,7 +163,8 @@ a {
 }
 
 .btn {
-  display: inline-block;
+  display: block;
+  text-align: center;
   background: #fff;
   color: #000;
   border: 3px solid var(--ink);
@@ -182,10 +186,8 @@ a {
 }
 
 .side-window {
-  position: absolute;
-  top: 28px;
-  right: 28px;
-  width: 240px;
+  position: static;
+  width: 100%;
   z-index: 1;
 }
 
@@ -204,9 +206,7 @@ a {
 }
 
 .chat-window {
-  width: min(520px, 100%);
-  margin-top: 28px;
-  margin-left: 48px;
+  width: 100%;
   position: relative;
   z-index: 3;
 }
@@ -344,18 +344,46 @@ a {
   }
 }
 
-@media (max-width: 860px) {
-  .side-window {
-    position: static;
-    width: min(640px, 100%);
-    margin-top: 20px;
+@media (min-width: 860px) {
+  .menubar {
+    flex-wrap: nowrap;
+    height: 28px;
+    padding: 0 12px;
+    gap: 18px;
   }
 
-  .chat-window {
-    margin-left: 0;
+  .desktop {
+    display: block;
+    min-height: calc(100vh - 64px);
+    padding: 36px 24px 48px;
+  }
+
+  .hero-window {
+    width: min(640px, 100%);
+  }
+
+  .window-body {
+    padding: 22px 22px 26px;
   }
 
   .headline {
-    font-size: 32px;
+    font-size: 40px;
+  }
+
+  .btn {
+    display: inline-block;
+  }
+
+  .side-window {
+    position: absolute;
+    top: 28px;
+    right: 28px;
+    width: 240px;
+  }
+
+  .chat-window {
+    width: min(520px, 100%);
+    margin-top: 28px;
+    margin-left: 48px;
   }
 }
