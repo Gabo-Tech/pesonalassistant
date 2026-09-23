@@ -38,12 +38,11 @@ a {
   font-size: 14px;
 }
 
-.apple {
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--line);
+.mark {
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: radial-gradient(circle at 70% 30%, transparent 2px, var(--line) 3px, transparent 4px);
+  display: block;
 }
 
 .menu-word {
