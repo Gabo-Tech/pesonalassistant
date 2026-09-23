@@ -60,7 +60,7 @@ class ListenForegroundService : Service() {
     return Notification.Builder(this, CHANNEL_ID)
       .setContentTitle(getString(R.string.listen_notification_title))
       .setContentText(getString(R.string.listen_notification_body))
-      .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+      .setSmallIcon(R.drawable.ic_notification)
       .setContentIntent(pending)
       .setOngoing(true)
       .build()

@@ -6,19 +6,90 @@
     <title>Assistant — a free voice that stays on the phone</title>
     <meta
       name="description"
-      content="Free on-device Android voice assistant. Notes, calendar, reminders, and alarms stay on the phone. A live search sends only that query."
+      content="Free Android voice assistant. Notes, calendar, tasks, reminders, and people stay on the phone. A live search sends only that query."
     />
+    <link rel="canonical" href="https://gabo-tech.github.io/pesonalassistant/" />
+    <meta name="theme-color" content="#0C0C0C" />
+    <link rel="icon" href="favicon.png" type="image/png" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Assistant — a free voice that stays on the phone" />
+    <meta
+      property="og:description"
+      content="Free Android voice assistant. Notes, calendar, tasks, reminders, and people stay on the phone."
+    />
+    <meta property="og:url" content="https://gabo-tech.github.io/pesonalassistant/" />
+    <meta property="og:image" content="https://gabo-tech.github.io/pesonalassistant/logo.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Assistant — a free voice that stays on the phone" />
+    <meta
+      name="twitter:description"
+      content="Free Android voice assistant. Notes, calendar, tasks, reminders, and people stay on the phone."
+    />
+    <meta name="twitter:image" content="https://gabo-tech.github.io/pesonalassistant/logo.png" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Assistant",
+        "operatingSystem": "Android",
+        "applicationCategory": "UtilitiesApplication",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "downloadUrl": "https://github.com/Gabo-Tech/pesonalassistant/releases/latest/download/assistant-2.0.1.apk",
+        "description": "Free Android voice assistant. Notes, calendar, tasks, reminders, and people stay on the phone. A live search sends only that query."
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Where does Assistant run?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Speech and the language model run on the phone. Notes, the calendar, tasks, reminders, and people stay in a local database."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What leaves the phone?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "A live-fact search sends only that query. An open question leaves only if you add a cloud key. Schedule questions stay on the phone."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does Assistant send messages?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. WhatsApp, Signal, and X open a draft, and only after you confirm."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How do I install Assistant?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Download the APK and allow install from this source. It is for Android 8 and up. There is no store listing and no account."
+            }
+          }
+        ]
+      }
+    </script>
     <link rel="stylesheet" href="styles.css?v=10" />
   </head>
   <body>
     <header class="menubar">
-      <img class="mark" src="logo.png" alt="" />
+      <img class="mark" src="logo.png" alt="Assistant" />
       <span class="menu-word">File</span>
       <span class="menu-word">Free</span>
       <a class="menu-word" href="https://github.com/Gabo-Tech/pesonalassistant">GitHub</a>
       <a
         class="menu-word download"
-        href="https://github.com/Gabo-Tech/pesonalassistant/releases/latest/download/assistant-2.0.0.apk"
+        href="https://github.com/Gabo-Tech/pesonalassistant/releases/latest/download/assistant-2.0.1.apk"
         >Download</a
       >
       <span class="cursor" aria-hidden="true"></span>
@@ -41,10 +112,10 @@
           <p class="transcript" id="transcript">Listening…</p>
           <a
             class="btn"
-            href="https://github.com/Gabo-Tech/pesonalassistant/releases/latest/download/assistant-2.0.0.apk"
+            href="https://github.com/Gabo-Tech/pesonalassistant/releases/latest/download/assistant-2.0.1.apk"
             >Download the free APK</a
           >
-          <p class="meta">Version 2.0.0 · sideload · Android 8 and up</p>
+          <p class="meta">Version 2.0.1 · sideload · Android 8 and up</p>
         </div>
       </section>
 
@@ -76,7 +147,11 @@
           </li>
           <li>
             <strong>Agenda</strong>
-            Events from a week out to a year, plus reminders you can edit.
+            An in-app calendar with all-day events, repeats, and an alert before they start. Reminders and tasks sit beside it.
+          </li>
+          <li>
+            <strong>People</strong>
+            A preferred way to reach each person: WhatsApp, Signal, or a call.
           </li>
           <li>
             <strong>Alarms</strong>
@@ -92,11 +167,37 @@
           </li>
           <li>
             <strong>Your model</strong>
-            Start light at 0.5B. Keep heavier models downloaded and switch when you want.
+            Start light at 0.5B on the phone. A cloud key in Settings is optional.
           </li>
           <li>
             <strong>Live facts</strong>
             Prices, news, and public events. One search. Only that query leaves the phone.
+          </li>
+        </ul>
+      </section>
+
+      <section class="window reveal">
+        <div class="titlebar">
+          <span class="close" aria-hidden="true"></span>
+          <p>Questions</p>
+          <span class="stripes" aria-hidden="true"></span>
+        </div>
+        <ul class="features">
+          <li>
+            <strong>Where does it run?</strong>
+            Speech and the language model run on the phone. Notes, the calendar, tasks, reminders, and people stay in a local database.
+          </li>
+          <li>
+            <strong>What leaves the phone?</strong>
+            A live-fact search sends only that query. An open question leaves only if you add a cloud key. Schedule questions stay on the phone.
+          </li>
+          <li>
+            <strong>Does it send messages?</strong>
+            No. WhatsApp, Signal, and X open a draft, and only after you confirm.
+          </li>
+          <li>
+            <strong>How do I install it?</strong>
+            Download the APK and allow install from this source. It is for Android 8 and up. There is no store listing and no account.
           </li>
         </ul>
       </section>
@@ -133,15 +234,15 @@
           <p class="pitch">Free. On your phone. Nothing to subscribe to.</p>
           <a
             class="btn"
-            href="https://github.com/Gabo-Tech/pesonalassistant/releases/latest/download/assistant-2.0.0.apk"
+            href="https://github.com/Gabo-Tech/pesonalassistant/releases/latest/download/assistant-2.0.1.apk"
             >Download the free APK</a
           >
-          <p class="meta">Version 2.0.0 · Android 8 and up</p>
+          <p class="meta">Version 2.0.1 · Android 8 and up</p>
         </div>
       </section>
     </main>
 
-    <footer class="foot">Assistant 2.0.0 · Android 8+ · Free</footer>
+    <footer class="foot">Assistant 2.0.1 · Android 8+ · Free</footer>
 
     <script>
       (function () {

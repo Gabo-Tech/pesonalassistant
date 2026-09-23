@@ -2,7 +2,7 @@
   "expo": {
     "name": "Assistant",
     "slug": "pesonalassistant",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "assistant",
@@ -13,13 +13,12 @@
     },
     "android": {
       "package": "com.local.assistant",
-      "versionCode": 11,
+      "versionCode": 12,
       "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "backgroundColor": "#0C0C0C",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundImage": "./assets/android-icon-background.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
@@ -63,7 +62,8 @@
       [
         "expo-notifications",
         {
-          "color": "#171717"
+          "icon": "./assets/notification-icon.png",
+          "color": "#F4F1EA"
         }
       ],
       "expo-audio",
