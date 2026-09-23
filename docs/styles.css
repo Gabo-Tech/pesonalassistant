@@ -1,7 +1,8 @@
 :root {
-  --paper: #1a1a1a;
-  --ink: #f4f4f4;
-  --desktop: #111;
+  --paper: #161616;
+  --ink: #f4f1ea;
+  --line: #2c2c2c;
+  --desktop: #0c0c0c;
   --bar: #0c0c0c;
 }
 
@@ -33,16 +34,16 @@ a {
   min-height: 28px;
   padding: 8px 12px;
   background: var(--bar);
-  border-bottom: 3px solid var(--ink);
+  border-bottom: 3px solid var(--line);
   font-size: 14px;
 }
 
 .apple {
   width: 14px;
   height: 14px;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line);
   border-radius: 50%;
-  background: radial-gradient(circle at 70% 30%, transparent 2px, var(--ink) 3px, transparent 4px);
+  background: radial-gradient(circle at 70% 30%, transparent 2px, var(--line) 3px, transparent 4px);
 }
 
 .menu-word {
@@ -71,9 +72,9 @@ a {
 
 .window {
   background: var(--paper);
-  border: 3px solid var(--ink);
+  border: 3px solid var(--line);
   border-radius: 16px;
-  box-shadow: 4px 4px 0 var(--ink);
+  box-shadow: 4px 4px 0 var(--line);
 }
 
 .titlebar {
@@ -82,9 +83,9 @@ a {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  border-bottom: 3px solid var(--ink);
+  border-bottom: 3px solid var(--line);
   border-radius: 13px 13px 0 0;
-  background: repeating-linear-gradient(to bottom, #1a1a1a 0 2px, var(--ink) 2px 3px);
+  background: repeating-linear-gradient(to bottom, #161616 0 2px, #3a3a3a 2px 3px);
   position: relative;
   overflow: hidden;
 }
@@ -94,7 +95,7 @@ a {
   justify-self: center;
   grid-column: 2;
   background: var(--paper);
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line);
   border-radius: 8px;
   padding: 1px 14px;
   font-size: 14px;
@@ -106,9 +107,9 @@ a {
 .close {
   width: 14px;
   height: 14px;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line);
   border-radius: 50%;
-  background: #fff;
+  background: #0c0c0c;
   position: relative;
   z-index: 1;
 }
@@ -157,9 +158,9 @@ a {
   text-align: center;
   background: #fff;
   color: #000;
-  border: 3px solid var(--ink);
+  border: 3px solid var(--line);
   border-radius: 12px;
-  box-shadow: 4px 4px 0 var(--ink);
+  box-shadow: 4px 4px 0 var(--line);
   padding: 12px 14px;
   text-decoration: none;
   font-weight: 700;
@@ -167,7 +168,7 @@ a {
 
 .btn:hover {
   transform: translate(2px, 2px);
-  box-shadow: 2px 2px 0 var(--ink);
+  box-shadow: 2px 2px 0 var(--line);
 }
 
 .meta {
@@ -184,7 +185,7 @@ a {
 
 .features li,
 .steps li {
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line);
   border-radius: 12px;
   padding: 10px 12px;
   line-height: 1.4;
@@ -213,7 +214,7 @@ a {
 }
 
 .foot {
-  border-top: 3px solid var(--ink);
+  border-top: 3px solid var(--line);
   background: var(--bar);
   color: var(--ink);
   padding: 10px 16px 16px;
