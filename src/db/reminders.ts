@@ -8,6 +8,8 @@ export type Reminder = {
   notification_id: string | null;
   completed: number;
   created_at: number;
+  /** In-app event this reminder follows. Null for a clock time or a phone-calendar event. */
+  anchor_event_id: number | null;
 };
 
 /**
@@ -15,7 +17,11 @@ export type Reminder = {
  * the user. The notification is the source of truth for "it went off"; the row
  * exists so the assistant can list and complete reminders.
  */
-export async function createReminder(text: string, dueAt: number): Promise<Reminder> {
+export async function createReminder(
+  text: string,
+  dueAt: number,
+  anchorEventId?: number | null,
+): Promise<Reminder> {
   if (dueAt <= Date.now()) {
     throw new Error('That time has already passed.');
   }
@@ -28,12 +34,15 @@ export async function createReminder(text: string, dueAt: number): Promise<Remin
   const db = await getDb();
   const ts = now();
 
+  const anchor = anchorEventId ?? null;
   const result = await db.runAsync(
-    'INSERT INTO reminders (text, due_at, notification_id, completed, created_at) VALUES (?, ?, ?, 0, ?)',
+    `INSERT INTO reminders (text, due_at, notification_id, completed, created_at, anchor_event_id)
+     VALUES (?, ?, ?, 0, ?, ?)`,
     text,
     dueAt,
     notificationId,
     ts,
+    anchor,
   );
 
   return {
@@ -43,6 +52,7 @@ export async function createReminder(text: string, dueAt: number): Promise<Remin
     notification_id: notificationId,
     completed: 0,
     created_at: ts,
+    anchor_event_id: anchor,
   };
 }
 
@@ -85,6 +95,20 @@ export async function updateReminder(
   const row = await getReminder(id);
   if (!row) throw new Error('Failed to update reminder');
   return row;
+}
+
+/** Moves reminders that were set for the end of an in-app event. */
+export async function rescheduleAnchoredReminders(eventId: number, endAt: number): Promise<void> {
+  if (endAt <= Date.now()) return;
+  const db = await getDb();
+  const rows = await db.getAllAsync<Reminder>(
+    'SELECT * FROM reminders WHERE anchor_event_id = ? AND completed = 0',
+    eventId,
+  );
+  for (const row of rows) {
+    if (row.due_at === endAt) continue;
+    await updateReminder(row.id, { dueAt: endAt });
+  }
 }
 
 export async function completeReminder(id: number): Promise<void> {

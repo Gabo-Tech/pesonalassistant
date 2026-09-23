@@ -71,6 +71,31 @@ describe('fallbackAsk', () => {
     assert.equal(spanish.action?.tool, 'create_event');
   });
 
+  it('sets a reminder for noon and right after an appointment', () => {
+    const noon = fallbackAsk('remind me to eat tomorrow at noon');
+    assert.equal(noon.action?.tool, 'create_reminder');
+    assert.match(noon.action?.when ?? '', /tomorrow at noon/i);
+
+    const after = fallbackAsk('remind me to call mum right after the dentist');
+    assert.equal(after.action?.tool, 'create_reminder');
+    assert.equal(after.action?.text, 'call mum');
+    assert.match(after.action?.when ?? '', /right after the dentist/i);
+  });
+
+  it('adds a task and summarizes the week without a model', () => {
+    const task = fallbackAsk('add a task to buy milk');
+    assert.equal(task.action?.tool, 'create_task');
+    assert.match(task.action?.title ?? '', /buy milk/i);
+
+    const week = fallbackAsk('how is my week');
+    assert.equal(week.action?.tool, 'brief');
+    assert.equal(week.action?.when, 'this week');
+
+    const spanish = fallbackAsk('qué tengo esta semana', 'es');
+    assert.equal(spanish.action?.tool, 'brief');
+    assert.equal(spanish.action?.when, 'this week');
+  });
+
   it('explains itself when it does not understand', () => {
     const reply = fallbackAsk('what is the meaning of life');
     assert.equal(reply.action, undefined);

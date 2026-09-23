@@ -1,10 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useState } from 'react';
 import type { Locale } from '../i18n/wake';
+import type { CloudProvider } from '../llm/cloud';
 import type { Appearance } from '../ui/theme';
 
 export type { Locale };
 export type WakeEngine = 'off' | 'whisper' | 'porcupine';
+export type LlmProvider = 'local' | CloudProvider;
 
 export type Settings = {
   /** Phrase that activates the assistant. Matched loosely against STT output. */
@@ -24,6 +26,10 @@ export type Settings = {
   vadThreshold: number;
   llmModelPath: string | null;
   sttModelPath: string | null;
+  /** On-device llama, or an optional cloud provider. The key itself is not stored here. */
+  llmProvider: LlmProvider;
+  /** Empty uses the provider's default model id. */
+  cloudModel: string;
   /** Android calendar chosen for new events. */
   calendarId: string | null;
   /** In-app events, or the phone calendar when the user opts in. */
@@ -55,6 +61,8 @@ export const DEFAULT_SETTINGS: Settings = {
   vadThreshold: 0.01,
   llmModelPath: null,
   sttModelPath: null,
+  llmProvider: 'local',
+  cloudModel: '',
   calendarId: null,
   calendarMode: 'app',
   sendCrawlerEnabled: false,

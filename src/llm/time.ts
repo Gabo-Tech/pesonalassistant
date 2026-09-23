@@ -86,6 +86,21 @@ function extractTimeOfDay(text: string): { hours: number; minutes: number } | nu
   return { hours, minutes };
 }
 
+/** Morning, noon, afternoon, evening, and night, in English and Spanish. */
+function namedClock(text: string): { hours: number; minutes: number } | null {
+  if (/\b(noon|midday|mediodia)\b/.test(text)) return { hours: 12, minutes: 0 };
+  if (/\b((?:por|de) la manana|morning)\b/.test(text)) return { hours: 9, minutes: 0 };
+  if (/\b((?:por|de) la tarde|afternoon)\b/.test(text)) return { hours: 15, minutes: 0 };
+  if (/\bevening\b/.test(text)) return { hours: 18, minutes: 0 };
+  if (/\b((?:por|de) la noche|night)\b/.test(text)) return { hours: 21, minutes: 0 };
+  return null;
+}
+
+/** "por la mañana" is a time of day, not the word tomorrow. */
+function withoutNamedMorning(text: string): string {
+  return text.replace(/\b(?:por|de) la manana\b/g, ' ');
+}
+
 function atTime(base: Date, time: { hours: number; minutes: number } | null): Date {
   const date = new Date(base);
   if (time) {
@@ -106,6 +121,10 @@ export function parseWhen(input: string, now = Date.now()): ParsedWhen | null {
     .trim();
   const nowDate = new Date(now);
   const time = extractTimeOfDay(text);
+  const named = namedClock(text);
+  const clock = time ?? named;
+  const explicit = Boolean(time || named);
+  const dayText = withoutNamedMorning(text);
 
   // "in 20 minutes", "en 20 minutos", "en una hora"
   const relative = text.match(
@@ -124,34 +143,34 @@ export function parseWhen(input: string, now = Date.now()): ParsedWhen | null {
     return { at: atTime(nowDate, time ?? { hours: 20, minutes: 0 }).getTime(), hadExplicitTime: true };
   }
 
-  if (/\b(day after tomorrow|pasado manana)\b/.test(text)) {
+  if (/\b(day after tomorrow|pasado manana)\b/.test(dayText)) {
     const date = new Date(now + 2 * 86_400_000);
-    return { at: atTime(date, time).getTime(), hadExplicitTime: Boolean(time) };
+    return { at: atTime(date, clock).getTime(), hadExplicitTime: explicit };
   }
 
-  if (/\b(tomorrow|manana)\b/.test(text)) {
+  if (/\b(tomorrow|manana)\b/.test(dayText)) {
     const date = new Date(now + 86_400_000);
-    return { at: atTime(date, time).getTime(), hadExplicitTime: Boolean(time) };
+    return { at: atTime(date, clock).getTime(), hadExplicitTime: explicit };
   }
 
   // "next monday", "on friday", "tuesday at 3pm", "el lunes"
   for (const [name, weekday] of Object.entries(WEEKDAYS)) {
     const plain = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    if (!new RegExp(`\\b${plain}\\b`).test(text)) continue;
+    if (!new RegExp(`\\b${plain}\\b`).test(dayText)) continue;
 
-    const wantNext = /\b(next|proximo|siguiente)\b/.test(text);
+    const wantNext = /\b(next|proximo|siguiente)\b/.test(dayText);
     const date = new Date(now);
     let delta = (weekday - date.getDay() + 7) % 7;
     if (delta === 0 || (wantNext && delta < 7)) delta = delta === 0 ? 7 : delta;
     date.setDate(date.getDate() + delta);
-    return { at: atTime(date, time).getTime(), hadExplicitTime: Boolean(time) };
+    return { at: atTime(date, clock).getTime(), hadExplicitTime: explicit };
   }
 
-  if (/\b(today|hoy)\b/.test(text) || time) {
-    const candidate = atTime(nowDate, time);
+  if (/\b(today|hoy)\b/.test(dayText) || clock) {
+    const candidate = atTime(nowDate, clock);
     // A time that already passed today almost always means tomorrow.
     if (candidate.getTime() <= now) candidate.setDate(candidate.getDate() + 1);
-    return { at: candidate.getTime(), hadExplicitTime: Boolean(time) };
+    return { at: candidate.getTime(), hadExplicitTime: explicit };
   }
 
   // Last resort: a real date string the model may have produced.

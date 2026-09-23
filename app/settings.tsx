@@ -8,6 +8,7 @@ import { deleteFact, listFacts, type Fact } from '../src/db/facts';
 import { useT } from '../src/i18n';
 import { localeWakeWord, type Locale } from '../src/i18n/wake';
 import { loadLlm, subscribeEngine, unloadLlm, type EngineStatus } from '../src/llm/engine';
+import { CLOUD_PRESETS } from '../src/llm/cloud';
 import {
   MODELS,
   deleteModel,
@@ -20,7 +21,8 @@ import {
 } from '../src/models/catalog';
 import { isCrawlerAvailable, isCrawlerEnabled } from '../src/share/crawler';
 import { openAccessibilitySettings, openTtsSettings } from '../src/share/intents';
-import { useSettings } from '../src/settings/store';
+import { useSettings, type LlmProvider } from '../src/settings/store';
+import { clearCloudKey, readCloudKey, saveCloudKey } from '../src/settings/secrets';
 import { Bento, BentoLabel, Chip, GUTTER, InkSwitch, PAGE_MARGIN } from '../src/ui/Bento';
 import { KeyboardGutter } from '../src/ui/KeyboardGutter';
 import { useTheme } from '../src/ui/ThemeProvider';
@@ -36,6 +38,18 @@ const SENSITIVITY = [
   { labelKey: 'voice.noisy' as const, value: 0.03 },
 ];
 
+const CLOUD_CHOICES = ['local', 'openai', 'anthropic', 'gemini', 'openrouter'] as const;
+
+function cloudLabelKey(
+  provider: LlmProvider,
+): 'settings.cloudLocal' | 'settings.cloudOpenAI' | 'settings.cloudAnthropic' | 'settings.cloudGemini' | 'settings.cloudOpenRouter' {
+  if (provider === 'openai') return 'settings.cloudOpenAI';
+  if (provider === 'anthropic') return 'settings.cloudAnthropic';
+  if (provider === 'gemini') return 'settings.cloudGemini';
+  if (provider === 'openrouter') return 'settings.cloudOpenRouter';
+  return 'settings.cloudLocal';
+}
+
 export default function SettingsScreen() {
   const t = useTheme();
   const tr = useT();
@@ -48,6 +62,8 @@ export default function SettingsScreen() {
   const [voices, setVoices] = useState<RankedVoice[]>([]);
   const [diskRev, setDiskRev] = useState(0);
   const [bulkProgress, setBulkProgress] = useState<{ name: string; fraction: number } | null>(null);
+  const [keyDraft, setKeyDraft] = useState('');
+  const [keyTail, setKeyTail] = useState<string | null>(null);
   const bulkCancel = useRef<(() => void) | null>(null);
 
   useEffect(() => subscribeEngine(setEngine), []);
@@ -75,6 +91,7 @@ export default function SettingsScreen() {
       void loadFacts();
       setCrawlerOn(isCrawlerEnabled());
       void listTtsVoices().then(setVoices);
+      void readCloudKey().then((value) => setKeyTail(value ? value.slice(-4) : null));
     }, [loadCalendars, loadFacts]),
   );
 
@@ -378,6 +395,77 @@ export default function SettingsScreen() {
         {MODELS.map((spec) => (
           <ModelRow key={spec.id} spec={spec} engine={engine} diskRev={diskRev} />
         ))}
+      </Section>
+
+      <Section title={tr('settings.cloud')}>
+        <Body style={{ color: t.dim }}>{tr('settings.cloudHint')}</Body>
+        <View style={styles.chipRow}>
+          {CLOUD_CHOICES.map((provider) => (
+            <Chip
+              key={provider}
+              label={tr(cloudLabelKey(provider))}
+              active={settings.llmProvider === provider}
+              onPress={() => void updateSettings({ llmProvider: provider })}
+            />
+          ))}
+        </View>
+        {settings.llmProvider !== 'local' ? (
+          <>
+            <View style={styles.chipRow}>
+              {CLOUD_PRESETS[settings.llmProvider].map((model) => (
+                <Chip
+                  key={model}
+                  label={model}
+                  active={settings.cloudModel === model}
+                  onPress={() => void updateSettings({ cloudModel: model })}
+                />
+              ))}
+            </View>
+            <TextInput
+              value={settings.cloudModel}
+              onChangeText={(cloudModel) => void updateSettings({ cloudModel })}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder={tr('settings.cloudModel')}
+              placeholderTextColor={t.dim}
+              style={[styles.input, { color: t.ink, borderColor: t.line, borderRadius: t.radiusChip }]}
+            />
+            <TextInput
+              value={keyDraft}
+              onChangeText={setKeyDraft}
+              autoCapitalize="none"
+              autoCorrect={false}
+              secureTextEntry
+              placeholder={
+                keyTail ? tr('settings.cloudKeySaved', { tail: keyTail }) : tr('settings.cloudKey')
+              }
+              placeholderTextColor={t.dim}
+              style={[styles.input, { color: t.ink, borderColor: t.line, borderRadius: t.radiusChip }]}
+            />
+            <InkButton
+              label={tr('settings.cloudSave')}
+              onPress={() => {
+                const next = keyDraft.trim();
+                if (!next) return;
+                void saveCloudKey(next).then(() => {
+                  setKeyTail(next.slice(-4));
+                  setKeyDraft('');
+                });
+              }}
+            />
+            {keyTail ? (
+              <GhostButton
+                label={tr('settings.cloudClear')}
+                onPress={() => {
+                  void clearCloudKey().then(() => {
+                    setKeyTail(null);
+                    setKeyDraft('');
+                  });
+                }}
+              />
+            ) : null}
+          </>
+        ) : null}
       </Section>
 
       <Section title={tr('settings.sending')}>

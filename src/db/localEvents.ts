@@ -1,4 +1,5 @@
 import { getDb, now } from './index';
+import { rescheduleAnchoredReminders } from './reminders';
 
 export type LocalEvent = {
   id: number;
@@ -72,6 +73,9 @@ export async function updateLocalEvent(
     now(),
     id,
   );
+  if (patch.end != null && patch.end !== current.end_at) {
+    await rescheduleAnchoredReminders(id, patch.end);
+  }
 }
 
 export async function deleteLocalEvent(id: number): Promise<void> {

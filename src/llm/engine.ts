@@ -1,8 +1,11 @@
 import { initLlama, type LlamaContext } from 'llama.rn';
+import { t } from '../i18n';
 import { listFacts } from '../db/facts';
 import { recentTurns } from '../db/turns';
 import { peekSettings } from '../settings/store';
+import { readCloudKey } from '../settings/secrets';
 import { fallbackAsk, matchCommand } from './fallback';
+import { cloudReplyText, cloudRequest, type CloudProvider, type CloudTurn } from './cloud';
 import { buildSystemPrompt } from './prompt';
 import { parseReply, REPLY_SCHEMA, type AssistantReply } from './tools';
 
@@ -10,8 +13,8 @@ import { parseReply, REPLY_SCHEMA, type AssistantReply } from './tools';
  * Wraps llama.cpp (via llama.rn) as a single long-lived context.
  *
  * Loading a GGUF costs seconds and hundreds of megabytes of RAM, so we do it once and
- * reuse the context for every request. Everything here is CPU inference on the phone;
- * no prompt or reply ever leaves the device.
+ * reuse the context for every request. On-device chat stays on the phone. A cloud
+ * provider is used only when Settings has one selected and a key is saved.
  */
 
 export type EngineStatus =
@@ -97,15 +100,28 @@ export async function unloadLlm(): Promise<void> {
  * always parseable JSON with a valid tool name.
  */
 export async function ask(userText: string): Promise<AssistantReply> {
-  const locale = peekSettings().locale;
+  const settings = peekSettings();
+  const locale = settings.locale;
   const command = matchCommand(userText, locale);
   if (command) return command;
+
+  if (settings.llmProvider !== 'local') {
+    const key = await readCloudKey();
+    if (key) {
+      try {
+        return await askCloud(userText, settings.llmProvider, settings.cloudModel, key, locale);
+      } catch {
+        return { say: t('cloud.failed') };
+      }
+    }
+  }
+
   if (!context) return fallbackAsk(userText, locale);
 
   const [history, facts] = await Promise.all([recentTurns(6), listFacts()]);
 
   const messages = [
-    { role: 'system', content: buildSystemPrompt(Date.now(), facts, locale) },
+    { role: 'system', content: buildSystemPrompt(Date.now(), facts, locale, true) },
     ...history
       .filter((turn) => turn.role !== 'system')
       .map((turn) => ({ role: turn.role, content: turn.text })),
@@ -126,4 +142,37 @@ export async function ask(userText: string): Promise<AssistantReply> {
   });
 
   return parseReply(result.text || result.content || '');
+}
+
+async function askCloud(
+  userText: string,
+  provider: CloudProvider,
+  model: string,
+  apiKey: string,
+  locale: 'en' | 'es',
+): Promise<AssistantReply> {
+  const [history, facts] = await Promise.all([recentTurns(6), listFacts()]);
+  const messages: CloudTurn[] = [
+    { role: 'system', content: buildSystemPrompt(Date.now(), facts, locale, false) },
+    ...history
+      .filter((turn) => turn.role === 'user' || turn.role === 'assistant')
+      .map((turn) => ({ role: turn.role as 'user' | 'assistant', content: turn.text })),
+    { role: 'user', content: userText },
+  ];
+  const request = cloudRequest({ provider, model, apiKey, messages });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000);
+  try {
+    const response = await fetch(request.url, {
+      method: 'POST',
+      headers: request.headers,
+      body: request.body,
+      signal: controller.signal,
+    });
+    if (!response.ok) return { say: t('cloud.failed') };
+    const payload: unknown = await response.json();
+    return parseReply(cloudReplyText(provider, payload));
+  } finally {
+    clearTimeout(timer);
+  }
 }

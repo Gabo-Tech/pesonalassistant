@@ -10,7 +10,16 @@ import {
   type SimpleEvent,
 } from '../src/calendar/events';
 import { EVENT_HORIZONS, horizonRange, type EventHorizonId } from '../src/calendar/range';
+import { buildBrief, weekBounds } from '../src/agenda/brief';
 import { cancelAlarm, createAlarm, listAlarms, updateAlarm, type Alarm } from '../src/db/alarms';
+import {
+  completeTask,
+  createTask,
+  deleteTask,
+  listTasks,
+  updateTask,
+  type Task,
+} from '../src/db/tasks';
 import {
   createLocalEvent,
   deleteLocalEvent,
@@ -36,6 +45,14 @@ import { Body, Display, Meta } from '../src/ui/Type';
 
 type AlarmDraft = { id?: number; time: string; label: string; daily: boolean };
 type ReminderDraft = { id?: number; text: string; when: string; originalAt?: number };
+type TaskDraft = {
+  id?: number;
+  title: string;
+  notes: string;
+  when: string;
+  important: boolean;
+  originalDue?: number | null;
+};
 type EventDraft = { id?: string; title: string; when: string; minutes: string; location: string; originalAt?: number };
 
 export default function AgendaScreen() {
@@ -44,45 +61,76 @@ export default function AgendaScreen() {
   const [settings] = useSettings();
   const loc = localeTag(settings.locale);
   const [alarms, setAlarms] = useState<Alarm[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [events, setEvents] = useState<SimpleEvent[]>([]);
+  const [weekText, setWeekText] = useState('');
   const [calendarDenied, setCalendarDenied] = useState(false);
   const [horizon, setHorizon] = useState<EventHorizonId>('7d');
   const [alarmDraft, setAlarmDraft] = useState<AlarmDraft | null>(null);
+  const [taskDraft, setTaskDraft] = useState<TaskDraft | null>(null);
   const [reminderDraft, setReminderDraft] = useState<ReminderDraft | null>(null);
   const [eventDraft, setEventDraft] = useState<EventDraft | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    setAlarms(await listAlarms());
-    setReminders(await listReminders());
+    const [alarmRows, reminderRows, taskRows] = await Promise.all([
+      listAlarms(),
+      listReminders(),
+      listTasks('open'),
+    ]);
+    setAlarms(alarmRows);
+    setReminders(reminderRows);
+    setTasks(taskRows);
+
+    const now = Date.now();
+    const week = weekBounds(now, 'this');
     const range = horizonRange(horizon);
 
+    let horizonEvents: SimpleEvent[] = [];
+    let weekEvents: { title: string; start: number }[] = [];
     if (settings.calendarMode !== 'phone') {
       setCalendarDenied(false);
-      const rows = await listLocalEvents(range.from, range.to);
-      setEvents(
-        rows.map((row) => ({
-          id: String(row.id),
-          title: row.title,
-          start: row.start_at,
-          end: row.end_at,
-          allDay: row.all_day === 1,
-          location: row.location || undefined,
-        })),
-      );
-      return;
+      const [horizonRows, weekRows] = await Promise.all([
+        listLocalEvents(range.from, range.to),
+        listLocalEvents(week.from, week.to),
+      ]);
+      horizonEvents = horizonRows.map((row) => ({
+        id: String(row.id),
+        title: row.title,
+        start: row.start_at,
+        end: row.end_at,
+        allDay: row.all_day === 1,
+        location: row.location || undefined,
+      }));
+      weekEvents = weekRows.map((row) => ({ title: row.title, start: row.start_at }));
+    } else {
+      const granted = await ensureCalendarPermission();
+      setCalendarDenied(!granted);
+      if (granted) {
+        const [horizonRows, weekRows] = await Promise.all([
+          listEvents(range.from, range.to),
+          listEvents(week.from, week.to),
+        ]);
+        horizonEvents = horizonRows;
+        weekEvents = weekRows.map((row) => ({ title: row.title, start: row.start }));
+      }
     }
 
-    const granted = await ensureCalendarPermission();
-    setCalendarDenied(!granted);
-    if (!granted) {
-      setEvents([]);
-      return;
-    }
-
-    setEvents(await listEvents(range.from, range.to));
-  }, [horizon, settings.calendarMode]);
+    setEvents(horizonEvents);
+    setWeekText(
+      buildBrief({
+        now,
+        span: 'this week',
+        from: week.from,
+        to: week.to,
+        locale: settings.locale,
+        events: weekEvents,
+        reminders: reminderRows.map((row) => ({ text: row.text, dueAt: row.due_at })),
+        tasks: taskRows.map((row) => ({ title: row.title, dueAt: row.due_at, status: row.status })),
+      }),
+    );
+  }, [horizon, settings.calendarMode, settings.locale]);
 
   useFocusEffect(
     useCallback(() => {
@@ -135,6 +183,33 @@ export default function AgendaScreen() {
     await refresh();
   };
 
+  const saveTask = async () => {
+    if (!taskDraft) return;
+    const title = taskDraft.title.trim();
+    if (!title) return;
+    const trimmed = taskDraft.when.trim();
+    let dueAt: number | null = null;
+    if (trimmed) {
+      const when = parseWhen(trimmed);
+      dueAt = when?.at ?? taskDraft.originalDue ?? null;
+      if (!dueAt) {
+        setFormError(tr('agenda.invalidWhen'));
+        return;
+      }
+    }
+    const patch = {
+      title,
+      notes: taskDraft.notes,
+      dueAt,
+      priority: taskDraft.important ? 1 : 0,
+    };
+    if (taskDraft.id) await updateTask(taskDraft.id, patch);
+    else await createTask(patch);
+    setTaskDraft(null);
+    setFormError(null);
+    await refresh();
+  };
+
   const saveEvent = async () => {
     if (!eventDraft) return;
     const when = parseWhen(eventDraft.when);
@@ -181,6 +256,99 @@ export default function AgendaScreen() {
       contentContainerStyle={styles.content}
     >
       {formError ? <Meta style={{ width: '100%' }}>{formError}</Meta> : null}
+
+      <Bento span={2} style={{ gap: 8 }}>
+        <Meta>{tr('agenda.thisWeek')}</Meta>
+        <Body>{weekText}</Body>
+      </Bento>
+
+      <SectionHead
+        title={tr('agenda.tasks')}
+        action={tr('agenda.addTask')}
+        onPress={() => {
+          setTaskDraft({ title: '', notes: '', when: '', important: false });
+          setFormError(null);
+        }}
+      />
+      {taskDraft && (
+        <Bento span={2} style={{ gap: 10 }}>
+          <Meta>{taskDraft.id ? tr('agenda.editTask') : tr('agenda.addTask')}</Meta>
+          <Field
+            label={tr('agenda.title')}
+            value={taskDraft.title}
+            onChange={(title) => setTaskDraft({ ...taskDraft, title })}
+          />
+          <Field
+            label={tr('agenda.notes')}
+            value={taskDraft.notes}
+            onChange={(notes) => setTaskDraft({ ...taskDraft, notes })}
+          />
+          <Field
+            label={tr('agenda.due')}
+            value={taskDraft.when}
+            onChange={(when) => setTaskDraft({ ...taskDraft, when })}
+            placeholder={tr('agenda.whenHint')}
+          />
+          <View style={styles.row}>
+            <Body style={{ flex: 1 }}>{tr('agenda.important')}</Body>
+            <InkSwitch
+              value={taskDraft.important}
+              onValueChange={(important) => setTaskDraft({ ...taskDraft, important })}
+            />
+          </View>
+          <FormActions onSave={() => void saveTask()} onCancel={() => setTaskDraft(null)} />
+        </Bento>
+      )}
+      {tasks.length === 0 && !taskDraft && (
+        <Bento span={2}>
+          <Meta>{tr('agenda.noneTasks')}</Meta>
+        </Bento>
+      )}
+      {tasks.map((task) => (
+        <Bento key={task.id} span={2} style={styles.row}>
+          <Pressable
+            style={{ flex: 1, gap: 6 }}
+            onPress={() =>
+              setTaskDraft({
+                id: task.id,
+                title: task.title,
+                notes: task.notes,
+                when: task.due_at ? formatWhen(task.due_at, loc) : '',
+                important: task.priority === 1,
+                originalDue: task.due_at,
+              })
+            }
+          >
+            <Body>{task.title}</Body>
+            <Meta>
+              {task.priority === 1 ? `${tr('agenda.important')} · ` : ''}
+              {task.due_at ? formatWhen(task.due_at, loc) : task.notes}
+            </Meta>
+          </Pressable>
+          <Pressable
+            onPress={() => void completeTask(task.id).then(refresh)}
+            hitSlop={10}
+            style={{ justifyContent: 'center' }}
+          >
+            <Meta style={{ color: t.ink }}>{tr('common.done')}</Meta>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              Alert.alert(tr('common.delete'), tr('agenda.deleteTask'), [
+                { text: tr('common.cancel'), style: 'cancel' },
+                {
+                  text: tr('common.delete'),
+                  style: 'destructive',
+                  onPress: () => void deleteTask(task.id).then(refresh),
+                },
+              ]);
+            }}
+            hitSlop={10}
+          >
+            <Meta>{tr('common.delete')}</Meta>
+          </Pressable>
+        </Bento>
+      ))}
 
       <SectionHead
         title={tr('agenda.alarms')}

@@ -1,4 +1,5 @@
 import { deleteEvent, createEvent, listEvents } from '../calendar/events';
+import { briefWindow, buildBrief } from '../agenda/brief';
 import { alarmSearchText, cancelAlarm, createAlarm, listAlarms } from '../db/alarms';
 import { deleteFactByTitle, listFacts, upsertFact } from '../db/facts';
 import { forgetFactQuery, pickFactToForget, rememberFactInput } from '../db/factsFormat';
@@ -9,6 +10,7 @@ import {
 } from '../db/localEvents';
 import { appendToNote, createNote, deleteNote, searchNotes } from '../db/notes';
 import { completeReminder, createReminder, deleteReminder, listReminders } from '../db/reminders';
+import { completeTask, createTask, deleteTask, listTasks } from '../db/tasks';
 import { t } from '../i18n';
 import { localeTag } from '../i18n/wake';
 import { inferNoteTitle } from '../notes/title';
@@ -16,6 +18,7 @@ import { requestConfirm } from '../share/confirmGate';
 import { armSend } from '../share/crawler';
 import { openDraft, TARGETS, type ShareTarget } from '../share/intents';
 import { peekSettings } from '../settings/store';
+import { eventQueryFromWhen, resolveAfterEvent } from './anchor';
 import { findUniqueMatch } from './match';
 import { chatAnswer, wantsAppendNote, wantsSavedNote } from './noteIntent';
 import { formatClockTime, formatWhen, parseRepeat, parseWhen } from './time';
@@ -41,6 +44,25 @@ function whenLabel(ms: number): string {
 
 function usesPhoneCalendar(): boolean {
   return peekSettings().calendarMode === 'phone';
+}
+
+async function loadSpan(from: number, to: number): Promise<
+  { id: string; title: string; start: number; end: number }[]
+> {
+  if (usesPhoneCalendar()) {
+    return (await listEvents(from, to)).map((event) => ({
+      id: event.id,
+      title: event.title,
+      start: event.start,
+      end: event.end,
+    }));
+  }
+  return (await listLocalEvents(from, to)).map((row) => ({
+    id: String(row.id),
+    title: row.title,
+    start: row.start_at,
+    end: row.end_at,
+  }));
 }
 
 function clockLabel(hour: number, minute: number): string {
@@ -115,7 +137,36 @@ export async function routeAction(
       const text = action.text?.trim() || action.title?.trim();
       if (!text) return ok(t('router.remindWhat'));
 
-      const when = parseWhen(action.when ?? '');
+      const whenRaw = action.when ?? '';
+      if (eventQueryFromWhen(whenRaw)) {
+        const from = Date.now();
+        const events = await loadSpan(from, from + 14 * 86_400_000);
+        const resolved = resolveAfterEvent(whenRaw, events);
+        if (resolved.kind === 'ambiguous') return ok(t('router.reminderWhich'));
+        if (resolved.kind === 'none') return ok(t('router.reminderNoEvent'));
+        if (resolved.at <= Date.now()) return ok(t('router.reminderPast'));
+
+        const at = new Date(resolved.at);
+        const clock = clockLabel(at.getHours(), at.getMinutes());
+        const anchorEventId = usesPhoneCalendar() ? null : Number(resolved.eventId);
+        requestConfirm(
+          {
+            kind: 'reminder',
+            summary: t('router.reminderSummary', { when: clock }),
+            detail: text,
+            speech: t('router.reminderAfterSpeech', { when: clock, title: resolved.title }),
+            confirmLabel: t('common.create'),
+            execute: async () => {
+              await createReminder(text, resolved.at, anchorEventId);
+              return t('router.reminderAfterSet', { when: clock, title: resolved.title });
+            },
+          },
+          timeout,
+        );
+        return pending(t('router.reminderAfterAsk', { when: clock, title: resolved.title }));
+      }
+
+      const when = parseWhen(whenRaw);
       if (!when) return ok(t('router.remindWhen'));
 
       const label = whenLabel(when.at);
@@ -176,6 +227,89 @@ export async function routeAction(
       }
       await deleteReminder(id);
       return ok(t('router.reminderDeleted'));
+    }
+
+    case 'create_task': {
+      const title = action.title?.trim() || action.text?.trim();
+      if (!title) return ok(t('router.taskWhat'));
+      const due = action.when ? parseWhen(action.when) : null;
+      if (action.when && !due) return ok(t('router.remindWhen'));
+      const priority = action.priority === 1 ? 1 : 0;
+      const whenText = due ? whenLabel(due.at) : t('router.taskNoDue');
+      requestConfirm(
+        {
+          kind: 'reminder',
+          summary: t('router.taskSummary', { title }),
+          detail: whenText,
+          speech: t('router.taskSpeech', { title, when: whenText }),
+          confirmLabel: t('common.create'),
+          execute: async () => {
+            await createTask({ title, dueAt: due?.at ?? null, priority });
+            return t('router.taskAdded', { title });
+          },
+        },
+        timeout,
+      );
+      return pending(t('router.taskAsk', { title }));
+    }
+
+    case 'list_tasks': {
+      const rows = await listTasks('open');
+      if (rows.length === 0) return ok(t('router.noTasks'));
+      return ok(
+        t('router.taskList', {
+          count: rows.length,
+          list: rows
+            .slice(0, 5)
+            .map((row) => (row.due_at ? `${row.title} (${whenLabel(row.due_at)})` : row.title))
+            .join('; '),
+        }),
+      );
+    }
+
+    case 'complete_task': {
+      const query = action.text?.trim() || action.title?.trim() || action.query?.trim();
+      if (!query && !action.id) return ok(t('router.whichTask'));
+      const rows = await listTasks('open');
+      const match = action.id
+        ? rows.find((row) => row.id === action.id)
+        : findUniqueMatch(rows, query ?? '', (row) => row.title);
+      if (!match) return ok(t('router.whichTask'));
+      await completeTask(match.id);
+      return ok(t('router.taskDone'));
+    }
+
+    case 'delete_task': {
+      const query = action.text?.trim() || action.title?.trim() || action.query?.trim() || '';
+      if (!query && !action.id) return ok(t('router.whichTask'));
+      const rows = await listTasks('open');
+      const match = action.id
+        ? rows.find((row) => row.id === action.id)
+        : findUniqueMatch(rows, query, (row) => row.title);
+      if (!match) return ok(t('router.whichTask'));
+      await deleteTask(match.id);
+      return ok(t('router.taskDeleted'));
+    }
+
+    case 'brief': {
+      const window = briefWindow(action.when ?? 'this week');
+      const [events, reminders, tasks] = await Promise.all([
+        loadSpan(window.from, window.to),
+        listReminders(),
+        listTasks(),
+      ]);
+      return ok(
+        buildBrief({
+          now: Date.now(),
+          span: window.span,
+          from: window.from,
+          to: window.to,
+          locale: peekSettings().locale,
+          events: events.map((event) => ({ title: event.title, start: event.start })),
+          reminders: reminders.map((row) => ({ text: row.text, dueAt: row.due_at })),
+          tasks: tasks.map((row) => ({ title: row.title, dueAt: row.due_at, status: row.status })),
+        }),
+      );
     }
 
     case 'create_alarm': {

@@ -176,6 +176,39 @@ export function matchCommand(userText: string, locale: Locale = 'en'): Assistant
     return reminderReply(text, recuerdame[1], locale);
   }
 
+  const task = text.match(/^(?:add|create|new)\s+(?:an?\s+)?(?:(important)\s+)?task(?:\s+to)?\s+(.+)/i);
+  if (task) return taskReply(task[2], locale, Boolean(task[1]));
+
+  const tarea = text.match(
+    /^(?:a[nñ]ade|agrega|crea|nueva)\s+(?:una\s+)?(?:(importante)\s+)?tarea(?:\s+(?:de|para))?\s+(.+)/i,
+  );
+  if (tarea) return taskReply(tarea[2], locale, Boolean(tarea[1]));
+
+  const finished = text.match(/^(?:i finished|i'?m done with|done with|completed)\s+(.+)/i)
+    ?? text.match(/^(?:termin[eé]|he terminado|ya hice|ya termin[eé])\s+(?:de\s+|con\s+)?(.+)/i);
+  if (finished) {
+    return {
+      say: say(locale, 'Marked done.', 'Marcado como hecho.'),
+      action: { tool: 'complete_task', text: finished[1].trim() },
+    };
+  }
+
+  if (
+    /^(?:what(?:'s| is) left|what tasks|list tasks|any tasks)$/i.test(lower) ||
+    /^(?:qu[eé] me queda|qu[eé] tareas|lista(?:r)? tareas)$/i.test(lower)
+  ) {
+    return { say: say(locale, 'Checking tasks.', 'Revisando tareas.'), action: { tool: 'list_tasks' } };
+  }
+
+  const deleteTask = text.match(/^(?:delete|remove)\s+(?:the\s+)?task\s+(.+)/i)
+    ?? text.match(/^(?:borra|elimina)\s+(?:la\s+)?tarea\s+(.+)/i);
+  if (deleteTask) {
+    return {
+      say: say(locale, 'Task deleted.', 'Tarea eliminada.'),
+      action: { tool: 'delete_task', query: deleteTask[1].trim() },
+    };
+  }
+
   const event = lower.match(/^(?:add|create|schedule)\s+(?:an?\s+)?(?:event|meeting)\s+(.+)/i);
   if (event) {
     return eventReply(text, event[1], locale);
@@ -204,6 +237,14 @@ export function matchCommand(userText: string, locale: Locale = 'en'): Assistant
 
   if (/\b(list reminders|what reminders|any reminders)\b/.test(lower) || /\b(qu[eé] recordatorios|lista recordatorios)\b/.test(lower)) {
     return { say: say(locale, 'Checking reminders.', 'Revisando recordatorios.'), action: { tool: 'list_reminders' } };
+  }
+
+  const brief = matchBrief(lower);
+  if (brief) {
+    return {
+      say: say(locale, 'Here is the summary.', 'Este es el resumen.'),
+      action: { tool: 'brief', when: brief },
+    };
   }
 
   const search = lower.match(/^(?:search notes|find notes?|look up notes?)\s+(.+)/i)
@@ -269,6 +310,20 @@ export function fallbackAsk(userText: string, locale: Locale = 'en'): AssistantR
 }
 
 function reminderReply(_text: string, rest: string, locale: Locale): AssistantReply {
+  const anchored = rest.match(
+    /^(.*?)\s+((?:right|just)\s+after|after|justo\s+despu[eé]s\s+de|despu[eé]s\s+de|tras)\s+(.+)$/i,
+  );
+  if (anchored?.[1].trim()) {
+    return {
+      say: say(
+        locale,
+        `Reminder set for right after ${anchored[3].trim()}.`,
+        `Recordatorio justo después de ${anchored[3].trim()}.`,
+      ),
+      action: { tool: 'create_reminder', text: anchored[1].trim(), when: `${anchored[2]} ${anchored[3]}`.trim() },
+    };
+  }
+
   const whenMatch = rest.match(
     /\b(in\s+\d+\s+\w+|en\s+\d+\s+\w+|tomorrow(?:\s+at\s+.+)?|ma[nñ]ana(?:\s+a las\s+.+)?|tonight(?:\s+at\s+.+)?|esta noche(?:\s+a las\s+.+)?|today(?:\s+at\s+.+)?|hoy(?:\s+a las\s+.+)?|at\s+\d.+$|a las\s+\d.+$|on\s+\w+.*$)\b/i,
   );
@@ -290,6 +345,45 @@ function eventReply(_text: string, rest: string, locale: Locale): AssistantReply
     say: say(locale, `Added "${title || rest}" on ${when}.`, `Añadido "${title || rest}" el ${when}.`),
     action: { tool: 'create_event', title: title || rest, when, duration_minutes: 60 },
   };
+}
+
+function taskReply(rest: string, locale: Locale, important: boolean): AssistantReply {
+  const whenMatch = rest.match(
+    /\b(tomorrow(?:\s+at\s+.+)?|ma[nñ]ana(?:\s+a las\s+.+)?|today(?:\s+at\s+.+)?|hoy(?:\s+a las\s+.+)?|tonight|esta noche|morning|noon|afternoon|evening|night|por la ma[nñ]ana|al mediod[ií]a|por la tarde|por la noche)\b/i,
+  );
+  const when = whenMatch?.[1];
+  const title = whenMatch && whenMatch.index != null ? rest.slice(0, whenMatch.index).trim() : rest.trim();
+  return {
+    say: say(locale, 'Task added.', 'Tarea añadida.'),
+    action: {
+      tool: 'create_task',
+      title: title || rest.trim(),
+      when,
+      priority: important ? 1 : 0,
+    },
+  };
+}
+
+function matchBrief(lower: string): string | null {
+  const text = lower.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const how = "how(?:'s|s| is)";
+  if (new RegExp(`^(?:${how} next week|what do i have next week|que tengo la semana que viene|como va la semana que viene)$`).test(text)) {
+    return 'next week';
+  }
+  if (
+    new RegExp(
+      `^(?:${how} (?:my |the )?week|what(?:'s| is| do i have)(?: on)? (?:my |this )?week|como va (?:mi |la )?semana|que tengo esta semana)$`,
+    ).test(text)
+  ) {
+    return 'this week';
+  }
+  if (new RegExp(`^(?:${how} tomorrow|what(?:'s| is| do i have)(?: on)? tomorrow|que tengo manana|como va manana)$`).test(text)) {
+    return 'tomorrow';
+  }
+  if (new RegExp(`^(?:${how} today|what(?:'s| is| do i have)(?: on)? today|que tengo hoy|como va hoy)$`).test(text)) {
+    return 'today';
+  }
+  return null;
 }
 
 function matchShare(

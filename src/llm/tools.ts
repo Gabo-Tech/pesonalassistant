@@ -21,6 +21,11 @@ export const TOOL_NAMES = [
   'list_reminders',
   'complete_reminder',
   'delete_reminder',
+  'create_task',
+  'list_tasks',
+  'complete_task',
+  'delete_task',
+  'brief',
   'create_alarm',
   'list_alarms',
   'cancel_alarm',
@@ -49,6 +54,8 @@ export type Action = {
   /** The user's own time words, parsed locally by src/llm/time.ts. */
   when?: string;
   duration_minutes?: number;
+  /** 1 marks a task important. */
+  priority?: number;
 };
 
 export type AssistantReply = {
@@ -80,6 +87,7 @@ export const REPLY_SCHEMA = {
         recipient: { type: 'string' },
         when: { type: 'string' },
         duration_minutes: { type: 'integer' },
+        priority: { type: 'integer' },
       },
       required: ['tool'],
     },
@@ -98,6 +106,7 @@ export const SHARE_TOOLS: ReadonlySet<ToolName> = new Set([
 export const WRITE_TOOLS: ReadonlySet<ToolName> = new Set([
   'create_event',
   'create_reminder',
+  'create_task',
   'create_alarm',
 ]);
 

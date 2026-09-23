@@ -41,6 +41,49 @@ describe('parseWhen', () => {
     assert.equal(new Date(spanish.at).getMinutes(), 0);
   });
 
+  it('reads noon, morning, afternoon, evening, and night', () => {
+    const noon = parseWhen('tomorrow at noon', noonMonday);
+    assert.ok(noon);
+    assert.equal(new Date(noon.at).getDate(), 22);
+    assert.equal(new Date(noon.at).getHours(), 12);
+
+    const morning = parseWhen('tomorrow morning', noonMonday);
+    assert.ok(morning);
+    assert.equal(new Date(morning.at).getHours(), 9);
+    assert.equal(morning.hadExplicitTime, true);
+
+    const afternoon = parseWhen('por la tarde', noonMonday);
+    assert.ok(afternoon);
+    assert.equal(new Date(afternoon.at).getDate(), 21);
+    assert.equal(new Date(afternoon.at).getHours(), 15);
+
+    const evening = parseWhen('this evening', noonMonday);
+    assert.ok(evening);
+    assert.equal(new Date(evening.at).getHours(), 18);
+
+    const night = parseWhen('tomorrow night', noonMonday);
+    assert.ok(night);
+    assert.equal(new Date(night.at).getDate(), 22);
+    assert.equal(new Date(night.at).getHours(), 21);
+  });
+
+  it('keeps tonight at 20:00 and does not treat por la mañana as tomorrow', () => {
+    const tonight = parseWhen('esta noche', noonMonday);
+    assert.ok(tonight);
+    assert.equal(new Date(tonight.at).getHours(), 20);
+
+    const early = Date.parse('2026-09-21T08:00:00');
+    const todayMorning = parseWhen('hoy por la mañana', early);
+    assert.ok(todayMorning);
+    assert.equal(new Date(todayMorning.at).getDate(), 21);
+    assert.equal(new Date(todayMorning.at).getHours(), 9);
+
+    const tomorrowMorning = parseWhen('mañana por la mañana', early);
+    assert.ok(tomorrowMorning);
+    assert.equal(new Date(tomorrowMorning.at).getDate(), 22);
+    assert.equal(new Date(tomorrowMorning.at).getHours(), 9);
+  });
+
   it('rolls a past clock time to tomorrow', () => {
     const parsed = parseWhen('at 9am', noonMonday);
     assert.ok(parsed);
