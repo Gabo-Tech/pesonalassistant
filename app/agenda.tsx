@@ -23,7 +23,7 @@ import {
 import {
   createLocalEvent,
   deleteLocalEvent,
-  listLocalEvents,
+  listOccurrences,
   updateLocalEvent,
 } from '../src/db/localEvents';
 import {
@@ -44,7 +44,13 @@ import { useTheme } from '../src/ui/ThemeProvider';
 import { Body, Display, Meta } from '../src/ui/Type';
 
 type AlarmDraft = { id?: number; time: string; label: string; daily: boolean };
-type ReminderDraft = { id?: number; text: string; when: string; originalAt?: number };
+type ReminderDraft = {
+  id?: number;
+  text: string;
+  when: string;
+  originalAt?: number;
+  repeat: 'once' | 'daily' | 'weekly';
+};
 type TaskDraft = {
   id?: number;
   title: string;
@@ -53,7 +59,21 @@ type TaskDraft = {
   important: boolean;
   originalDue?: number | null;
 };
-type EventDraft = { id?: string; title: string; when: string; minutes: string; location: string; originalAt?: number };
+type ShownEvent = SimpleEvent & {
+  repeat: 'none' | 'daily' | 'weekly' | 'monthly';
+  alert: number | null;
+};
+type EventDraft = {
+  id?: string;
+  title: string;
+  when: string;
+  minutes: string;
+  location: string;
+  originalAt?: number;
+  allDay: boolean;
+  repeat: 'none' | 'daily' | 'weekly' | 'monthly';
+  alert: number | null;
+};
 
 export default function AgendaScreen() {
   const t = useTheme();
@@ -63,7 +83,7 @@ export default function AgendaScreen() {
   const [alarms, setAlarms] = useState<Alarm[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
-  const [events, setEvents] = useState<SimpleEvent[]>([]);
+  const [events, setEvents] = useState<ShownEvent[]>([]);
   const [weekText, setWeekText] = useState('');
   const [calendarDenied, setCalendarDenied] = useState(false);
   const [horizon, setHorizon] = useState<EventHorizonId>('7d');
@@ -87,23 +107,25 @@ export default function AgendaScreen() {
     const week = weekBounds(now, 'this');
     const range = horizonRange(horizon);
 
-    let horizonEvents: SimpleEvent[] = [];
+    let horizonEvents: ShownEvent[] = [];
     let weekEvents: { title: string; start: number }[] = [];
     if (settings.calendarMode !== 'phone') {
       setCalendarDenied(false);
       const [horizonRows, weekRows] = await Promise.all([
-        listLocalEvents(range.from, range.to),
-        listLocalEvents(week.from, week.to),
+        listOccurrences(range.from, range.to),
+        listOccurrences(week.from, week.to),
       ]);
       horizonEvents = horizonRows.map((row) => ({
         id: String(row.id),
         title: row.title,
-        start: row.start_at,
-        end: row.end_at,
-        allDay: row.all_day === 1,
+        start: row.occurrenceStart,
+        end: row.occurrenceEnd,
+        allDay: row.allDay,
         location: row.location || undefined,
+        repeat: row.repeat,
+        alert: row.alertMinutes ?? null,
       }));
-      weekEvents = weekRows.map((row) => ({ title: row.title, start: row.start_at }));
+      weekEvents = weekRows.map((row) => ({ title: row.title, start: row.occurrenceStart }));
     } else {
       const granted = await ensureCalendarPermission();
       setCalendarDenied(!granted);
@@ -112,7 +134,11 @@ export default function AgendaScreen() {
           listEvents(range.from, range.to),
           listEvents(week.from, week.to),
         ]);
-        horizonEvents = horizonRows;
+        horizonEvents = horizonRows.map((row) => ({
+          ...row,
+          repeat: 'none',
+          alert: null,
+        }));
         weekEvents = weekRows.map((row) => ({ title: row.title, start: row.start }));
       }
     }
@@ -174,9 +200,9 @@ export default function AgendaScreen() {
       return;
     }
     if (reminderDraft.id) {
-      await updateReminder(reminderDraft.id, { text: reminderDraft.text, dueAt });
+      await updateReminder(reminderDraft.id, { text: reminderDraft.text, dueAt, repeat: reminderDraft.repeat });
     } else {
-      await createReminder(reminderDraft.text.trim(), dueAt);
+      await createReminder(reminderDraft.text.trim(), dueAt, null, reminderDraft.repeat);
     }
     setReminderDraft(null);
     setFormError(null);
@@ -221,25 +247,38 @@ export default function AgendaScreen() {
     const minutes = Number(eventDraft.minutes) || 60;
     const title = eventDraft.title.trim();
     if (!title) return;
-    const end = start + minutes * 60_000;
+    let end = start + minutes * 60_000;
+    let begin = start;
+    if (eventDraft.allDay) {
+      const day = new Date(start);
+      day.setHours(0, 0, 0, 0);
+      begin = day.getTime();
+      end = begin + 86_400_000;
+    }
     const location = eventDraft.location.trim();
     if (settings.calendarMode !== 'phone') {
-      if (eventDraft.id) {
-        await updateLocalEvent(Number(eventDraft.id), { title, start, end, location });
-      } else {
-        await createLocalEvent({ title, start, end, location });
-      }
+      const patch = {
+        title,
+        start: begin,
+        end,
+        location,
+        allDay: eventDraft.allDay,
+        repeat: eventDraft.repeat,
+        alertMinutes: eventDraft.alert,
+      };
+      if (eventDraft.id) await updateLocalEvent(Number(eventDraft.id), patch);
+      else await createLocalEvent(patch);
     } else if (eventDraft.id) {
       await updateEvent(eventDraft.id, {
         title,
-        start,
+        start: begin,
         end,
         location: location || undefined,
       });
     } else {
       await createEvent({
         title,
-        start,
+        start: begin,
         end,
         location: location || undefined,
       });
@@ -428,7 +467,7 @@ export default function AgendaScreen() {
         title={tr('agenda.reminders')}
         action={tr('agenda.addReminder')}
         onPress={() => {
-          setReminderDraft({ text: '', when: '' });
+          setReminderDraft({ text: '', when: '', repeat: 'once' });
           setFormError(null);
         }}
       />
@@ -446,6 +485,22 @@ export default function AgendaScreen() {
             onChange={(when) => setReminderDraft({ ...reminderDraft, when })}
             placeholder={tr('agenda.whenHint')}
           />
+          <View style={styles.chips}>
+            {(['once', 'daily', 'weekly'] as const).map((repeat) => (
+              <Chip
+                key={repeat}
+                label={tr(
+                  repeat === 'once'
+                    ? 'agenda.once'
+                    : repeat === 'daily'
+                      ? 'agenda.daily'
+                      : 'agenda.weekly',
+                )}
+                active={reminderDraft.repeat === repeat}
+                onPress={() => setReminderDraft({ ...reminderDraft, repeat })}
+              />
+            ))}
+          </View>
           <FormActions onSave={() => void saveReminder()} onCancel={() => setReminderDraft(null)} />
         </Bento>
       )}
@@ -464,6 +519,7 @@ export default function AgendaScreen() {
                 text: reminder.text,
                 when: formatWhen(reminder.due_at, loc),
                 originalAt: reminder.due_at,
+                repeat: reminder.repeat === 'daily' || reminder.repeat === 'weekly' ? reminder.repeat : 'once',
               })
             }
           >
@@ -510,7 +566,7 @@ export default function AgendaScreen() {
       </View>
       <Pressable
         onPress={() => {
-          setEventDraft({ title: '', when: '', minutes: '60', location: '' });
+          setEventDraft({ title: '', when: '', minutes: '60', location: '', allDay: false, repeat: 'none', alert: null });
           setFormError(null);
         }}
         style={{ width: '100%' }}
@@ -542,6 +598,50 @@ export default function AgendaScreen() {
             value={eventDraft.location}
             onChange={(location) => setEventDraft({ ...eventDraft, location })}
           />
+          {settings.calendarMode !== 'phone' ? (
+            <>
+              <View style={styles.row}>
+                <Body style={{ flex: 1 }}>{tr('agenda.allDay')}</Body>
+                <InkSwitch
+                  value={eventDraft.allDay}
+                  onValueChange={(allDay) => setEventDraft({ ...eventDraft, allDay })}
+                />
+              </View>
+              <View style={styles.chips}>
+                {(['none', 'daily', 'weekly', 'monthly'] as const).map((repeat) => (
+                  <Chip
+                    key={repeat}
+                    label={tr(
+                      repeat === 'none'
+                        ? 'agenda.once'
+                        : repeat === 'daily'
+                          ? 'agenda.daily'
+                          : repeat === 'weekly'
+                            ? 'agenda.weekly'
+                            : 'agenda.monthly',
+                    )}
+                    active={eventDraft.repeat === repeat}
+                    onPress={() => setEventDraft({ ...eventDraft, repeat })}
+                  />
+                ))}
+              </View>
+              <View style={styles.chips}>
+                {[
+                  { minutes: null, key: 'agenda.alertNone' as const },
+                  { minutes: 10, key: 'agenda.alert10' as const },
+                  { minutes: 60, key: 'agenda.alertHour' as const },
+                  { minutes: 1440, key: 'agenda.alertDay' as const },
+                ].map((option) => (
+                  <Chip
+                    key={option.key}
+                    label={tr(option.key)}
+                    active={eventDraft.alert === option.minutes}
+                    onPress={() => setEventDraft({ ...eventDraft, alert: option.minutes })}
+                  />
+                ))}
+              </View>
+            </>
+          ) : null}
           <FormActions onSave={() => void saveEvent()} onCancel={() => setEventDraft(null)} />
         </Bento>
       )}
@@ -555,8 +655,21 @@ export default function AgendaScreen() {
           <Meta>{tr('agenda.noneEvents')}</Meta>
         </Bento>
       )}
-      {events.map((event) => (
-        <Bento key={event.id} span={2} style={styles.row}>
+      {events.map((event, index) => {
+        const day = new Date(event.start).toDateString();
+        const previous = index > 0 ? new Date(events[index - 1].start).toDateString() : '';
+        return (
+          <View key={`${event.id}-${event.start}`} style={{ width: '100%', gap: GUTTER }}>
+            {day !== previous ? (
+              <Meta>
+                {new Date(event.start).toLocaleDateString(loc, {
+                  weekday: 'long',
+                  month: 'short',
+                  day: 'numeric',
+                })}
+              </Meta>
+            ) : null}
+            <Bento span={2} style={styles.row}>
           <Pressable
             style={{ flex: 1, gap: 6 }}
             onPress={() =>
@@ -567,6 +680,9 @@ export default function AgendaScreen() {
                 minutes: String(Math.max(15, Math.round((event.end - event.start) / 60_000))),
                 location: event.location ?? '',
                 originalAt: event.start,
+                allDay: event.allDay,
+                repeat: event.repeat,
+                alert: event.alert,
               })
             }
           >
@@ -598,7 +714,9 @@ export default function AgendaScreen() {
             <Meta>{tr('common.delete')}</Meta>
           </Pressable>
         </Bento>
-      ))}
+          </View>
+        );
+      })}
     </ScrollView>
     </KeyboardGutter>
   );

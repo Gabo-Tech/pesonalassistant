@@ -31,6 +31,10 @@ export const TOOL_NAMES = [
   'cancel_alarm',
   'remember_fact',
   'forget_fact',
+  'create_contact',
+  'delete_contact',
+  'call_contact',
+  'message_contact',
   'draft_whatsapp',
   'draft_signal',
   'draft_tweet',
@@ -100,6 +104,7 @@ export const SHARE_TOOLS: ReadonlySet<ToolName> = new Set([
   'draft_whatsapp',
   'draft_signal',
   'draft_tweet',
+  'call_contact',
 ]);
 
 /** Tools that write to the device and get a lightweight confirm. */
@@ -108,6 +113,7 @@ export const WRITE_TOOLS: ReadonlySet<ToolName> = new Set([
   'create_reminder',
   'create_task',
   'create_alarm',
+  'create_contact',
 ]);
 
 /**

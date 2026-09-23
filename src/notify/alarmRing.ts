@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { dismissAlarm, getAlarm, snoozeAlarm, type Alarm } from '../db/alarms';
+import { rollReminderForward } from '../db/reminders';
 import { formatClockTime } from '../llm/time';
 import { speak, stopSpeaking } from '../voice/tts';
 import {
@@ -68,14 +69,33 @@ export async function handleAlarmSnooze(): Promise<void> {
   if (current) await snoozeAlarm(current.id);
 }
 
+function reminderIdFromData(data: Record<string, unknown> | undefined): number | null {
+  if (!data || data.kind !== 'reminder') return null;
+  const raw = data.reminderId;
+  const id = typeof raw === 'number' ? raw : Number(raw);
+  return Number.isFinite(id) ? id : null;
+}
+
 function onNotification(notification: Notifications.Notification): void {
-  const id = alarmIdFromData(notification.request.content.data as Record<string, unknown>);
+  const data = notification.request.content.data as Record<string, unknown>;
+  const reminderId = reminderIdFromData(data);
+  if (reminderId != null) {
+    void rollReminderForward(reminderId);
+    return;
+  }
+  const id = alarmIdFromData(data);
   if (id == null) return;
   void presentAlarm(id);
 }
 
 function onResponse(response: Notifications.NotificationResponse): void {
-  const id = alarmIdFromData(response.notification.request.content.data as Record<string, unknown>);
+  const data = response.notification.request.content.data as Record<string, unknown>;
+  const reminderId = reminderIdFromData(data);
+  if (reminderId != null) {
+    void rollReminderForward(reminderId);
+    return;
+  }
+  const id = alarmIdFromData(data);
   if (id == null) return;
 
   if (response.actionIdentifier === ALARM_DISMISS) {

@@ -126,6 +126,15 @@ function ThemedTabs({ hideChrome }: { hideChrome: boolean }) {
         }}
       />
       <Tabs.Screen
+        name="people"
+        options={{
+          title: tr('tabs.people'),
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'people' : 'people-outline'} size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="settings"
         options={{
           title: tr('tabs.settings'),

@@ -96,6 +96,24 @@ describe('fallbackAsk', () => {
     assert.equal(spanish.action?.when, 'this week');
   });
 
+  it('routes a message, a call, and a saved contact', () => {
+    const message = fallbackAsk("message Marie I'm running late");
+    assert.equal(message.action?.tool, 'message_contact');
+    assert.equal(message.action?.recipient, 'Marie');
+
+    const call = fallbackAsk('call Marie');
+    assert.equal(call.action?.tool, 'call_contact');
+
+    const saved = fallbackAsk('add contact Marie WhatsApp +34611223344');
+    assert.equal(saved.action?.tool, 'create_contact');
+    assert.equal(saved.action?.title, 'Marie');
+    assert.equal(saved.action?.query, 'whatsapp');
+
+    const event = fallbackAsk('add an event dentist every Tuesday at 3');
+    assert.equal(event.action?.tool, 'create_event');
+    assert.match(event.action?.when ?? '', /every Tuesday/i);
+  });
+
   it('explains itself when it does not understand', () => {
     const reply = fallbackAsk('what is the meaning of life');
     assert.equal(reply.action, undefined);

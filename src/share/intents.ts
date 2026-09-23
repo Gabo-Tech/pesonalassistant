@@ -1,5 +1,6 @@
 import * as IntentLauncher from 'expo-intent-launcher';
 import { Linking, Platform } from 'react-native';
+import { callUrl, digitsOnly, signalChatUrl } from './reach';
 
 export type ShareTarget = 'whatsapp' | 'signal' | 'x';
 
@@ -40,9 +41,8 @@ export async function isTargetAvailable(target: ShareTarget): Promise<boolean> {
   }
 }
 
-/** Digits only - wa.me rejects '+', spaces and dashes. */
 export function normalizePhone(raw: string): string {
-  return raw.replace(/\D/g, '');
+  return digitsOnly(raw);
 }
 
 /**
@@ -51,6 +51,10 @@ export function normalizePhone(raw: string): string {
  * This never sends anything by itself: it stops on the compose screen. Sending is
  * either the user's own tap, or the armed Accessibility service (see crawler.ts).
  */
+export async function openCall(phone: string): Promise<void> {
+  await Linking.openURL(callUrl(phone));
+}
+
 export async function openDraft(
   target: ShareTarget,
   text: string,
@@ -68,6 +72,14 @@ export async function openDraft(
     const phone = normalizePhone(recipient);
     if (phone) {
       await Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`);
+      return;
+    }
+  }
+
+  if (target === 'signal' && recipient) {
+    const phone = normalizePhone(recipient);
+    if (phone) {
+      await Linking.openURL(signalChatUrl(phone));
       return;
     }
   }
@@ -92,6 +104,7 @@ function webFallbackUrl(target: ShareTarget, text: string, recipient?: string | 
       return `https://wa.me/${phone}?text=${encoded}`;
     }
     case 'signal':
+      if (recipient && normalizePhone(recipient)) return signalChatUrl(recipient);
       return `sgnl://send?text=${encoded}`;
     case 'x':
       return `https://twitter.com/intent/tweet?text=${encoded}`;

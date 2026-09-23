@@ -221,6 +221,39 @@ export function matchCommand(userText: string, locale: Locale = 'en'): Assistant
     return eventReply(text, evento[1], locale);
   }
 
+  const contact = text.match(/^(?:add|save)(?: a)? contact\s+(.+)/i)
+    ?? text.match(/^(?:a[nñ]ade|agrega)(?: a)? contacto\s+(.+)/i)
+    ?? text.match(/^(?:a[nñ]ade|agrega) a\s+([A-Za-zÁÉÍÓÚáéíóúñ].+)$/i);
+  if (contact && !/\b(evento|event|reuni[oó]n|meeting|nota|note|tarea|task)\b/i.test(contact[1])) {
+    return contactReply(contact[1], locale);
+  }
+
+  const message = text.match(/^(?:message|text)\s+(.+?)\s+(?:that\s+)?(.+)$/i)
+    ?? text.match(/^(?:dile a|mensaje a|m[aá]ndale a|mandale a)\s+(.+?)\s+que\s+(.+)$/i);
+  if (message && !/whatsapp|signal/i.test(text)) {
+    return {
+      say: say(locale, `Message for ${message[1].trim()}.`, `Mensaje para ${message[1].trim()}.`),
+      action: { tool: 'message_contact', recipient: message[1].trim(), text: message[2].trim() },
+    };
+  }
+
+  const call = text.match(/^(?:call)\s+(.+)$/i) ?? text.match(/^(?:llama(?:r)? a)\s+(.+)$/i);
+  if (call) {
+    return {
+      say: say(locale, `Call ${call[1].trim()}?`, `¿Llamar a ${call[1].trim()}?`),
+      action: { tool: 'call_contact', recipient: call[1].trim() },
+    };
+  }
+
+  const deleteContact = text.match(/^(?:delete|remove)(?: the)? contact\s+(.+)/i)
+    ?? text.match(/^(?:borra|elimina)(?: el)? contacto\s+(.+)/i);
+  if (deleteContact) {
+    return {
+      say: say(locale, 'Contact deleted.', 'Contacto eliminado.'),
+      action: { tool: 'delete_contact', title: deleteContact[1].trim() },
+    };
+  }
+
   const calendarLine = lower.match(/^(?:add|put)\s+(.+?)\s+(?:on|to)\s+(?:my\s+)?(?:calendar|agenda)$/i);
   if (calendarLine) return eventReply(text, calendarLine[1], locale);
 
@@ -337,13 +370,28 @@ function reminderReply(_text: string, rest: string, locale: Locale): AssistantRe
 
 function eventReply(_text: string, rest: string, locale: Locale): AssistantReply {
   const whenMatch = rest.match(
-    /\b(tomorrow|ma[nñ]ana|tonight|esta noche|today|hoy|on\s+\w+|el\s+\w+|at\s+\d.+|a las\s+\d.+|in\s+\d+\s+\w+|en\s+\d+\s+\w+)/i,
+    /\b((?:every|cada|todos los|todas las|all day|todo el d[ií]a)\b.*|(?:tomorrow|ma[nñ]ana|tonight|esta noche|today|hoy|on\s+\w+|el\s+\w+|at\s+\d.+|a las\s+\d.+|in\s+\d+\s+\w+|en\s+\d+\s+\w+))/i,
   );
-  const when = whenMatch?.[0] ?? 'tomorrow at 9';
-  const title = whenMatch ? rest.slice(0, whenMatch.index).trim() : rest;
+  const when = whenMatch?.[1] ?? 'tomorrow at 9';
+  const title = whenMatch && whenMatch.index != null ? rest.slice(0, whenMatch.index).trim() : rest;
   return {
     say: say(locale, `Added "${title || rest}" on ${when}.`, `Añadido "${title || rest}" el ${when}.`),
     action: { tool: 'create_event', title: title || rest, when, duration_minutes: 60 },
+  };
+}
+
+function contactReply(rest: string, locale: Locale): AssistantReply {
+  const phoneMatch = rest.match(/(\+?\d[\d\s()-]{5,})\s*$/);
+  const phone = phoneMatch?.[1]?.trim() ?? '';
+  let body = phoneMatch && phoneMatch.index != null ? rest.slice(0, phoneMatch.index).trim() : rest.trim();
+  const channelMatch = body.match(/\b(whatsapp|signal|call|llamada)\b\s*$/i);
+  const preferred = channelMatch ? (channelMatch[1].toLowerCase().startsWith('llam') ? 'call' : channelMatch[1].toLowerCase()) : 'whatsapp';
+  if (channelMatch && channelMatch.index != null) {
+    body = body.slice(0, channelMatch.index).replace(/[,\s]+$/, '');
+  }
+  return {
+    say: say(locale, `Saved ${body}.`, `Guardado ${body}.`),
+    action: { tool: 'create_contact', title: body, text: phone, query: preferred },
   };
 }
 

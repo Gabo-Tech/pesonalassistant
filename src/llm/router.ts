@@ -1,12 +1,14 @@
+import { parseAlertMinutes, parseAllDay, parseEventRepeat } from '../calendar/expand';
 import { deleteEvent, createEvent, listEvents } from '../calendar/events';
 import { briefWindow, buildBrief } from '../agenda/brief';
 import { alarmSearchText, cancelAlarm, createAlarm, listAlarms } from '../db/alarms';
 import { deleteFactByTitle, listFacts, upsertFact } from '../db/facts';
 import { forgetFactQuery, pickFactToForget, rememberFactInput } from '../db/factsFormat';
+import { createContact, deleteContact, listContacts } from '../db/contacts';
 import {
   createLocalEvent,
   deleteLocalEvent,
-  listLocalEvents,
+  listOccurrences,
 } from '../db/localEvents';
 import { appendToNote, createNote, deleteNote, searchNotes } from '../db/notes';
 import { completeReminder, createReminder, deleteReminder, listReminders } from '../db/reminders';
@@ -16,12 +18,13 @@ import { localeTag } from '../i18n/wake';
 import { inferNoteTitle } from '../notes/title';
 import { requestConfirm } from '../share/confirmGate';
 import { armSend } from '../share/crawler';
-import { openDraft, TARGETS, type ShareTarget } from '../share/intents';
+import { openCall, openDraft, TARGETS, type ShareTarget } from '../share/intents';
 import { peekSettings } from '../settings/store';
 import { eventQueryFromWhen, resolveAfterEvent } from './anchor';
+import { matchPeople, pickChannel, type Channel } from '../contacts/prefer';
 import { findUniqueMatch } from './match';
 import { chatAnswer, wantsAppendNote, wantsSavedNote } from './noteIntent';
-import { formatClockTime, formatWhen, parseRepeat, parseWhen } from './time';
+import { formatClockTime, formatWhen, parseReminderRepeat, parseRepeat, parseWhen } from './time';
 import type { Action } from './tools';
 
 export type RouteResult = {
@@ -57,11 +60,11 @@ async function loadSpan(from: number, to: number): Promise<
       end: event.end,
     }));
   }
-  return (await listLocalEvents(from, to)).map((row) => ({
+  return (await listOccurrences(from, to)).map((row) => ({
     id: String(row.id),
     title: row.title,
-    start: row.start_at,
-    end: row.end_at,
+    start: row.occurrenceStart,
+    end: row.occurrenceEnd,
   }));
 }
 
@@ -178,7 +181,7 @@ export async function routeAction(
           speech: t('router.reminderSpeech', { when: label }),
           confirmLabel: t('common.create'),
           execute: async () => {
-            await createReminder(text, when.at);
+            await createReminder(text, when.at, null, parseReminderRepeat(whenRaw));
             return t('router.reminderSet', { when: label });
           },
         },
@@ -389,24 +392,36 @@ export async function routeAction(
       const title = action.title?.trim() || action.text?.trim();
       if (!title) return ok(t('router.eventWhat'));
 
+      const spoken = `${action.when ?? ''} ${title}`;
       const when = parseWhen(action.when ?? '');
       if (!when) return ok(t('router.eventWhen'));
 
+      const allDay = parseAllDay(spoken);
+      const repeat = parseEventRepeat(spoken);
+      const alertMinutes = parseAlertMinutes(spoken);
       const minutes = action.duration_minutes ?? 60;
-      const label = whenLabel(when.at);
+      let start = when.at;
+      let end = when.at + minutes * 60_000;
+      if (allDay) {
+        const day = new Date(when.at);
+        day.setHours(0, 0, 0, 0);
+        start = day.getTime();
+        end = start + 86_400_000;
+      }
+      const label = whenLabel(start);
 
       requestConfirm(
         {
           kind: 'calendar',
           summary: t('router.eventSummary', { when: label }),
-          detail: t('router.eventDetail', { title, minutes }),
+          detail: t('router.eventDetail', { title, minutes: allDay ? 24 * 60 : minutes }),
           speech: t('router.eventSpeech', { title, when: label }),
           confirmLabel: t('common.create'),
           execute: async () => {
             if (usesPhoneCalendar()) {
-              await createEvent({ title, start: when.at, end: when.at + minutes * 60_000 });
+              await createEvent({ title, start, end });
             } else {
-              await createLocalEvent({ title, start: when.at, end: when.at + minutes * 60_000 });
+              await createLocalEvent({ title, start, end, allDay, repeat, alertMinutes });
             }
             return t('router.eventAdded', { title, when: label });
           },
@@ -424,13 +439,9 @@ export async function routeAction(
       const fromMs = dayStart.getTime();
       const toMs = dayEnd.getTime();
 
-      const events = usesPhoneCalendar()
-        ? await listEvents(fromMs, toMs)
-        : (await listLocalEvents(fromMs, toMs)).map((row) => ({
-            id: String(row.id),
-            title: row.title,
-            start: row.start_at,
-          }));
+      const events = await (usesPhoneCalendar()
+        ? listEvents(fromMs, toMs)
+        : loadSpan(fromMs, toMs));
       if (events.length === 0) return ok(t('router.nothingCalendar'));
       return ok(
         t('router.eventsList', {
@@ -448,12 +459,9 @@ export async function routeAction(
       const query = action.title?.trim() || action.query?.trim() || action.text?.trim() || '';
       if (!query) return ok(t('router.whichEvent'));
       const now = Date.now();
-      const events = usesPhoneCalendar()
-        ? await listEvents(now, now + 30 * 86_400_000)
-        : (await listLocalEvents(now, now + 30 * 86_400_000)).map((row) => ({
-            id: String(row.id),
-            title: row.title,
-          }));
+      const events = await (usesPhoneCalendar()
+        ? listEvents(now, now + 30 * 86_400_000)
+        : loadSpan(now, now + 30 * 86_400_000));
       const match = findUniqueMatch(events, query, (event) => event.title);
       if (!match) return ok(t('router.whichEvent'));
       if (usesPhoneCalendar()) await deleteEvent(match.id);
@@ -486,6 +494,14 @@ export async function routeAction(
       return draftMessage('signal', action, timeout);
     case 'draft_tweet':
       return draftMessage('x', action, timeout);
+    case 'create_contact':
+      return createContactAction(action, timeout);
+    case 'delete_contact':
+      return deleteContactAction(action);
+    case 'call_contact':
+      return callContactAction(action, timeout);
+    case 'message_contact':
+      return messageContactAction(action, timeout);
 
     case 'none':
     default:
@@ -493,11 +509,16 @@ export async function routeAction(
   }
 }
 
-function draftMessage(target: ShareTarget, action: Action, timeout: number): RouteResult {
+async function draftMessage(target: ShareTarget, action: Action, timeout: number): Promise<RouteResult> {
   const text = action.text?.trim();
   if (!text) return ok(t('router.messageWhat'));
 
-  const recipient = action.recipient?.trim() || null;
+  let recipient = action.recipient?.trim() || null;
+  if (recipient && target !== 'x' && !/^\+?\d[\d\s()-]+$/.test(recipient)) {
+    const hit = matchPeople(await listContacts(), recipient, (person) => person.name);
+    if (hit.kind === 'many') return ok(t('router.whichPerson'));
+    if (hit.kind === 'one') recipient = hit.item.phone || hit.item.name;
+  }
   const label = TARGETS[target].label;
   const to = recipient ? ` to ${recipient}` : '';
 
@@ -523,4 +544,81 @@ function draftMessage(target: ShareTarget, action: Action, timeout: number): Rou
   );
 
   return pending(t('router.shareAsk', { label, to, text }));
+}
+
+function createContactAction(action: Action, timeout: number): RouteResult {
+  const name = action.title?.trim();
+  if (!name) return ok(t('router.contactWhat'));
+  const phone = action.text?.trim() ?? '';
+  const preferred: Channel = action.query === 'signal' || action.query === 'call' ? action.query : 'whatsapp';
+  requestConfirm(
+    {
+      kind: 'share',
+      summary: t('router.contactSummary', { name }),
+      detail: phone || preferred,
+      speech: t('router.contactSpeech', { name }),
+      confirmLabel: t('common.save'),
+      execute: async () => {
+        await createContact({ name, phone, preferred });
+        return t('router.contactAdded', { name });
+      },
+    },
+    timeout,
+  );
+  return pending(t('router.contactAsk', { name }));
+}
+
+async function deleteContactAction(action: Action): Promise<RouteResult> {
+  const query = action.title?.trim() || action.recipient?.trim() || action.query?.trim() || '';
+  if (!query) return ok(t('router.whichPerson'));
+  const hit = matchPeople(await listContacts(), query, (person) => person.name);
+  if (hit.kind !== 'one') return ok(t('router.whichPerson'));
+  await deleteContact(hit.item.id);
+  return ok(t('router.contactDeleted', { name: hit.item.name }));
+}
+
+async function callContactAction(action: Action, timeout: number): Promise<RouteResult> {
+  const name = action.recipient?.trim() || action.title?.trim() || '';
+  if (!name) return ok(t('router.whoCall'));
+  const hit = matchPeople(await listContacts(), name, (person) => person.name);
+  if (hit.kind === 'many') return ok(t('router.whichPerson'));
+  if (hit.kind === 'none') {
+    if (/\d/.test(name)) return confirmCall(name, name, timeout);
+    return ok(t('router.whoCall'));
+  }
+  if (!hit.item.phone) return ok(t('router.noPhone', { name: hit.item.name }));
+  return confirmCall(hit.item.name, hit.item.phone, timeout);
+}
+
+async function messageContactAction(action: Action, timeout: number): Promise<RouteResult> {
+  const text = action.text?.trim();
+  const name = action.recipient?.trim();
+  if (!text || !name) return ok(t('router.messageWhat'));
+  const hit = matchPeople(await listContacts(), name, (person) => person.name);
+  if (hit.kind === 'many') return ok(t('router.whichPerson'));
+  if (hit.kind === 'none') return draftMessage('whatsapp', action, timeout);
+  const channel = pickChannel(hit.item.preferred, null);
+  if (channel === 'call') {
+    if (!hit.item.phone) return ok(t('router.noPhone', { name: hit.item.name }));
+    return confirmCall(hit.item.name, hit.item.phone, timeout);
+  }
+  return draftMessage(channel, { ...action, recipient: hit.item.phone || hit.item.name }, timeout);
+}
+
+function confirmCall(name: string, phone: string, timeout: number): RouteResult {
+  requestConfirm(
+    {
+      kind: 'share',
+      summary: t('router.callSummary', { name }),
+      detail: phone,
+      speech: t('router.callSpeech', { name }),
+      confirmLabel: t('people.call'),
+      execute: async () => {
+        await openCall(phone);
+        return t('router.calling', { name });
+      },
+    },
+    timeout,
+  );
+  return pending(t('router.callAsk', { name }));
 }

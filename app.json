@@ -2,7 +2,7 @@
   "expo": {
     "name": "Assistant",
     "slug": "pesonalassistant",
-    "version": "1.9.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "assistant",
@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "com.local.assistant",
-      "versionCode": 10,
+      "versionCode": 11,
       "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "backgroundColor": "#0C0C0C",
@@ -32,7 +32,8 @@
         "android.permission.WAKE_LOCK",
         "android.permission.VIBRATE",
         "android.permission.READ_CALENDAR",
-        "android.permission.WRITE_CALENDAR"
+        "android.permission.WRITE_CALENDAR",
+        "android.permission.READ_CONTACTS"
       ]
     },
     "web": {
@@ -67,7 +68,13 @@
       ],
       "expo-audio",
       "expo-asset",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Assistant reads your contacts only when you tap Import, and keeps a copy on this phone."
+        }
+      ]
     ],
     "extra": {
       "router": {}

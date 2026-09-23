@@ -92,6 +92,7 @@ export async function prepareNotifications(): Promise<boolean> {
 export async function scheduleReminderNotification(
   text: string,
   dueAt: number,
+  reminderId: number,
 ): Promise<string | null> {
   const granted = await prepareNotifications();
   if (!granted) return null;
@@ -103,11 +104,33 @@ export async function scheduleReminderNotification(
     content: {
       title: 'Reminder',
       body: text,
+      data: { kind: 'reminder', reminderId: String(reminderId) },
       ...(Platform.OS === 'android' ? { channelId: REMINDER_CHANNEL } : null),
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
       date: new Date(dueAt),
+    },
+  });
+}
+
+export async function scheduleEventAlert(
+  eventId: number,
+  title: string,
+  at: number,
+): Promise<string | null> {
+  const granted = await prepareNotifications();
+  if (!granted || at <= Date.now()) return null;
+  return Notifications.scheduleNotificationAsync({
+    content: {
+      title: 'Event',
+      body: title,
+      data: { kind: 'event', eventId: String(eventId) },
+      ...(Platform.OS === 'android' ? { channelId: REMINDER_CHANNEL } : null),
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: new Date(at),
     },
   });
 }

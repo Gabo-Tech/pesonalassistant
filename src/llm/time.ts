@@ -203,6 +203,14 @@ export function parseRepeat(when: string): AlarmRepeat {
     : 'once';
 }
 
+export type ReminderCadence = 'once' | 'daily' | 'weekly';
+
+export function parseReminderRepeat(when: string): ReminderCadence {
+  const text = when.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (/\b(every\s+week|weekly|cada semana|todas las semanas)\b/i.test(text)) return 'weekly';
+  return parseRepeat(when) === 'daily' ? 'daily' : 'once';
+}
+
 /** Next clock time at hour:minute, rolling to tomorrow if that instant has passed. */
 export function nextOccurrence(hour: number, minute: number, from = Date.now()): number {
   const date = new Date(from);
