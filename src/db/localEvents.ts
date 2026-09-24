@@ -142,8 +142,8 @@ export async function updateLocalEvent(
     now(),
     id,
   );
-  if (end !== current.end_at) {
-    await rescheduleAnchoredReminders(id, end);
+  if (end !== current.end_at || start !== current.start_at) {
+    await rescheduleAnchoredReminders(id, start, end);
   }
 }
 

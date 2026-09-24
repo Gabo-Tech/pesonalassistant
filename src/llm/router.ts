@@ -29,10 +29,10 @@ import { localeTag } from '../i18n/wake';
 import { isInboxLabel, noteColorKey, parseNoteMark } from '../notes/organize';
 import { inferNoteTitle } from '../notes/title';
 import { requestConfirm } from '../share/confirmGate';
-import { armSend } from '../share/crawler';
-import { openCall, openDraft, TARGETS, type ShareTarget } from '../share/intents';
+import { armSend, disarmSend } from '../share/crawler';
+import { openCall, openDraft, planDraft, TARGETS, type ShareTarget } from '../share/intents';
 import { peekSettings } from '../settings/store';
-import { eventQueryFromWhen, resolveAfterEvent } from './anchor';
+import { eventQueryFromWhen, resolveEventAnchor } from './anchor';
 import { matchPeople, pickChannel, type Channel } from '../contacts/prefer';
 import { findUniqueMatch } from './match';
 import { chatAnswer, wantsAppendNote, wantsFiledNote, wantsMarkedNote, wantsSavedNote } from './noteIntent';
@@ -205,7 +205,7 @@ export async function routeAction(
       if (eventQueryFromWhen(whenRaw)) {
         const from = Date.now();
         const events = await loadSpan(from, from + 14 * 86_400_000);
-        const resolved = resolveAfterEvent(whenRaw, events);
+        const resolved = resolveEventAnchor(whenRaw, events);
         if (resolved.kind === 'ambiguous') return ok(t('router.reminderWhich'));
         if (resolved.kind === 'none') return ok(t('router.reminderNoEvent'));
         if (resolved.at <= Date.now()) return ok(t('router.reminderPast'));
@@ -213,8 +213,10 @@ export async function routeAction(
         const at = new Date(resolved.at);
         const clock = clockLabel(at.getHours(), at.getMinutes());
         const anchorEventId = usesPhoneCalendar() ? null : Number(resolved.eventId);
-        await createReminder(text, resolved.at, anchorEventId);
-        return ok(t('router.reminderAfterSet', { when: clock, title: resolved.title }));
+        const label = text === whenRaw ? resolved.title : text;
+        await createReminder(label, resolved.at, anchorEventId, 'once', resolved.offsetMs);
+        const key = resolved.offsetMs < 0 ? 'router.reminderBeforeSet' : 'router.reminderAfterSet';
+        return ok(t(key, { when: clock, title: resolved.title }));
       }
 
       const when = parseWhen(whenRaw);
@@ -595,11 +597,19 @@ async function draftMessage(target: ShareTarget, action: Action, timeout: number
       }),
       confirmLabel: t('common.send'),
       execute: async () => {
-        const automatic = armSend(target, text);
-        await openDraft(target, text, recipient);
-        return automatic
-          ? t('router.shareSending', { label })
-          : t('router.shareOpened', { label });
+        // Arm only when the draft will carry the approved body (Signal chat URLs do not).
+        const automatic = planDraft(target, text, recipient).prefilled
+          ? armSend(target, text)
+          : false;
+        try {
+          await openDraft(target, text, recipient);
+          return automatic
+            ? t('router.shareSending', { label })
+            : t('router.shareOpened', { label });
+        } catch (error) {
+          disarmSend();
+          throw error;
+        }
       },
     },
     timeout,

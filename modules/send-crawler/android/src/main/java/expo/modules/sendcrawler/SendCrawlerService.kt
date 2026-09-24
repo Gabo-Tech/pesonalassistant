@@ -59,7 +59,17 @@ class SendCrawlerService : AccessibilityService() {
     val viewId = node.viewIdResourceName?.lowercase().orEmpty()
     val blob = "$desc $text $viewId"
 
-    val labels = arrayOf("send", "send message", "send now", "post", "tweet", "publish")
+    val labels = arrayOf(
+      "send",
+      "send message",
+      "send now",
+      "post",
+      "tweet",
+      "publish",
+      "enviar",
+      "enviar mensaje",
+      "publicar",
+    )
     if (labels.any { desc == it || text == it }) return true
     if (viewId.contains("send") && (desc.contains("send") || text.contains("send") || desc.isEmpty())) return true
     return labels.any { blob.contains(it) && node.isClickable }

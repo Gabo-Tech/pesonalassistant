@@ -89,6 +89,31 @@ describe('parseWhen', () => {
     assert.ok(parsed);
     assert.ok(parsed.at > noonMonday);
   });
+
+  it('parses November 20th and 20 de noviembre', () => {
+    const en = parseWhen('november 20th at 9 am', noonMonday);
+    assert.ok(en);
+    const enDate = new Date(en.at);
+    assert.equal(enDate.getMonth(), 10);
+    assert.equal(enDate.getDate(), 20);
+    assert.equal(enDate.getHours(), 9);
+    assert.equal(enDate.getFullYear(), 2026);
+
+    const es = parseWhen('20 de noviembre a las 9', noonMonday);
+    assert.ok(es);
+    const esDate = new Date(es.at);
+    assert.equal(esDate.getMonth(), 10);
+    assert.equal(esDate.getDate(), 20);
+    assert.equal(esDate.getHours(), 9);
+  });
+
+  it('parses on saturday as next Saturday', () => {
+    const parsed = parseWhen('on saturday', noonMonday);
+    assert.ok(parsed);
+    const date = new Date(parsed.at);
+    assert.equal(date.getDay(), 6);
+    assert.equal(date.getDate(), 26);
+  });
 });
 
 describe('parseRepeat', () => {

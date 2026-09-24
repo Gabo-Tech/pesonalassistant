@@ -7,7 +7,7 @@ const DB_NAME = 'assistant.db';
  * `PRAGMA user_version`, so the app can upgrade an existing phone database in
  * place instead of wiping the user's notes.
  */
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 9;
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
@@ -168,6 +168,13 @@ async function migrate(db: SQLite.SQLiteDatabase): Promise<void> {
       CREATE INDEX notes_folder_idx ON notes (folder_id, pinned DESC, sort_order ASC);
     `);
     version = 8;
+  }
+
+  if (version === 8) {
+    await db.execAsync(`
+      ALTER TABLE reminders ADD COLUMN anchor_offset_ms INTEGER NOT NULL DEFAULT 0;
+    `);
+    version = 9;
   }
 
   await db.execAsync(`PRAGMA user_version = ${version}`);

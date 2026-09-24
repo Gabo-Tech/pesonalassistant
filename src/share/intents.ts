@@ -1,8 +1,9 @@
 import * as IntentLauncher from 'expo-intent-launcher';
 import { Linking, Platform } from 'react-native';
-import { callUrl, digitsOnly, signalChatUrl } from './reach';
+import { callUrl, digitsOnly, planDraft, signalChatUrl, type ShareTarget } from './reach';
 
-export type ShareTarget = 'whatsapp' | 'signal' | 'x';
+export type { ShareTarget } from './reach';
+export { planDraft } from './reach';
 
 type TargetMeta = {
   label: string;
@@ -46,7 +47,8 @@ export function normalizePhone(raw: string): string {
 }
 
 /**
- * Opens the target app with the message pre-filled, and returns how it was opened.
+ * Opens the target app with the message pre-filled, and returns whether the body
+ * was placed in the compose field (so the caller can decide whether to arm Send).
  *
  * This never sends anything by itself: it stops on the compose screen. Sending is
  * either the user's own tap, or the armed Accessibility service (see crawler.ts).
@@ -59,40 +61,28 @@ export async function openDraft(
   target: ShareTarget,
   text: string,
   recipient?: string | null,
-): Promise<void> {
+): Promise<{ prefilled: boolean }> {
   if (Platform.OS !== 'android') {
-    // Web/iOS fallback: universal links only.
     await Linking.openURL(webFallbackUrl(target, text, recipient));
-    return;
+    return { prefilled: Boolean(text.trim()) };
   }
 
-  // WhatsApp is the only one of the three that can target a specific contact
-  // straight from a link, so prefer that when we know the number.
-  if (target === 'whatsapp' && recipient) {
-    const phone = normalizePhone(recipient);
-    if (phone) {
-      await Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`);
-      return;
-    }
-  }
-
-  if (target === 'signal' && recipient) {
-    const phone = normalizePhone(recipient);
-    if (phone) {
-      await Linking.openURL(signalChatUrl(phone));
-      return;
-    }
+  const plan = planDraft(target, text, recipient);
+  if (plan.kind === 'url') {
+    await Linking.openURL(plan.url);
+    return { prefilled: plan.prefilled };
   }
 
   try {
     await IntentLauncher.startActivityAsync('android.intent.action.SEND', {
-      packageName: TARGETS[target].packageName,
+      packageName: plan.packageName,
       type: 'text/plain',
-      extra: { 'android.intent.extra.TEXT': text },
+      extra: { 'android.intent.extra.TEXT': plan.text },
     });
+    return { prefilled: plan.prefilled };
   } catch {
-    // App missing or refused the intent - fall back to the website.
     await Linking.openURL(webFallbackUrl(target, text, recipient));
+    return { prefilled: Boolean(text.trim()) };
   }
 }
 
@@ -104,6 +94,8 @@ function webFallbackUrl(target: ShareTarget, text: string, recipient?: string | 
       return `https://wa.me/${phone}?text=${encoded}`;
     }
     case 'signal':
+      // Prefer text-bearing scheme when there is a body; chat URL only when empty.
+      if (text.trim()) return `sgnl://send?text=${encoded}`;
       if (recipient && normalizePhone(recipient)) return signalChatUrl(recipient);
       return `sgnl://send?text=${encoded}`;
     case 'x':

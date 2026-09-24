@@ -12,6 +12,8 @@ export type Reminder = {
   created_at: number;
   /** In-app event this reminder follows. Null for a clock time or a phone-calendar event. */
   anchor_event_id: number | null;
+  /** Negative = before start; non-negative = after end. Used when the event moves. */
+  anchor_offset_ms: number;
   repeat: ReminderRepeat;
 };
 
@@ -30,6 +32,7 @@ export async function createReminder(
   dueAt: number,
   anchorEventId?: number | null,
   repeat: ReminderRepeat = 'once',
+  anchorOffsetMs = 0,
 ): Promise<Reminder> {
   if (dueAt <= Date.now()) {
     throw new Error('That time has already passed.');
@@ -39,14 +42,16 @@ export async function createReminder(
   const ts = now();
   const anchor = anchorEventId ?? null;
   const cadence = asRepeat(repeat);
+  const offset = Number.isFinite(anchorOffsetMs) ? Math.trunc(anchorOffsetMs) : 0;
   const result = await db.runAsync(
-    `INSERT INTO reminders (text, due_at, notification_id, completed, created_at, anchor_event_id, repeat)
-     VALUES (?, ?, NULL, 0, ?, ?, ?)`,
+    `INSERT INTO reminders (text, due_at, notification_id, completed, created_at, anchor_event_id, repeat, anchor_offset_ms)
+     VALUES (?, ?, NULL, 0, ?, ?, ?, ?)`,
     text,
     dueAt,
     ts,
     anchor,
     cadence,
+    offset,
   );
   const id = result.lastInsertRowId;
   const notificationId = await scheduleReminderNotification(text, dueAt, id);
@@ -64,6 +69,7 @@ export async function createReminder(
     completed: 0,
     created_at: ts,
     anchor_event_id: anchor,
+    anchor_offset_ms: offset,
     repeat: cadence,
   };
 }
@@ -134,17 +140,23 @@ export async function rollReminderForward(id: number, from = Date.now()): Promis
   }
 }
 
-/** Moves reminders that were set for the end of an in-app event. */
-export async function rescheduleAnchoredReminders(eventId: number, endAt: number): Promise<void> {
-  if (endAt <= Date.now()) return;
+/** Moves reminders that were set relative to an in-app event's start or end. */
+export async function rescheduleAnchoredReminders(
+  eventId: number,
+  startAt: number,
+  endAt: number,
+): Promise<void> {
   const db = await getDb();
   const rows = await db.getAllAsync<Reminder>(
     'SELECT * FROM reminders WHERE anchor_event_id = ? AND completed = 0',
     eventId,
   );
   for (const row of rows) {
-    if (row.due_at === endAt) continue;
-    await updateReminder(row.id, { dueAt: endAt });
+    const offset = Number(row.anchor_offset_ms) || 0;
+    const dueAt = offset < 0 ? startAt + offset : endAt + offset;
+    if (dueAt <= Date.now()) continue;
+    if (row.due_at === dueAt) continue;
+    await updateReminder(row.id, { dueAt });
   }
 }
 

@@ -26,5 +26,7 @@ describe('looksLikeTask', () => {
     assert.equal(looksLikeTask('move the dentist to 4'), true);
     assert.equal(looksLikeTask('change the milk task'), true);
     assert.equal(looksLikeTask('send Marie I am late'), true);
+    assert.equal(looksLikeTask("Publish this post on X 'Hi y'all'"), true);
+    assert.equal(looksLikeTask('post on twitter hello'), true);
   });
 });

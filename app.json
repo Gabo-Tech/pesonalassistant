@@ -2,7 +2,7 @@
   "expo": {
     "name": "Assistant",
     "slug": "pesonalassistant",
-    "version": "2.1.1",
+    "version": "2.1.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "assistant",
@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "com.local.assistant",
-      "versionCode": 14,
+      "versionCode": 15,
       "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "backgroundColor": "#0C0C0C",

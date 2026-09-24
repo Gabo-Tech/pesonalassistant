@@ -34,6 +34,47 @@ const WEEKDAYS: Record<string, number> = {
   sábado: 6,
 };
 
+const MONTHS: Record<string, number> = {
+  january: 0,
+  jan: 0,
+  enero: 0,
+  february: 1,
+  feb: 1,
+  febrero: 1,
+  march: 2,
+  mar: 2,
+  marzo: 2,
+  april: 3,
+  apr: 3,
+  abril: 3,
+  may: 4,
+  mayo: 4,
+  june: 5,
+  jun: 5,
+  junio: 5,
+  july: 6,
+  jul: 6,
+  julio: 6,
+  august: 7,
+  aug: 7,
+  agosto: 7,
+  september: 8,
+  sep: 8,
+  sept: 8,
+  septiembre: 8,
+  october: 9,
+  oct: 9,
+  octubre: 9,
+  november: 10,
+  nov: 10,
+  noviembre: 10,
+  december: 11,
+  dec: 11,
+  diciembre: 11,
+};
+
+const MONTH_NAMES = Object.keys(MONTHS).join('|');
+
 const UNIT_MS: Record<string, number> = {
   minute: 60_000,
   minutes: 60_000,
@@ -111,6 +152,105 @@ function atTime(base: Date, time: { hours: number; minutes: number } | null): Da
   return date;
 }
 
+function startOfDay(ms: number): number {
+  const date = new Date(ms);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+}
+
+function endOfDay(ms: number): number {
+  const date = new Date(ms);
+  date.setHours(23, 59, 59, 999);
+  return date.getTime();
+}
+
+/** "November 20", "Nov 20th", "20 de noviembre" → calendar day, or null. */
+function absoluteDay(dayText: string, now: number): Date | null {
+  const en = dayText.match(new RegExp(`\\b(${MONTH_NAMES})\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`));
+  if (en) {
+    const month = MONTHS[en[1]];
+    const day = Number(en[2]);
+    if (month == null || day < 1 || day > 31) return null;
+    return futureMonthDay(now, month, day);
+  }
+
+  const es = dayText.match(new RegExp(`\\b(\\d{1,2})\\s+de\\s+(${MONTH_NAMES})\\b`));
+  if (es) {
+    const day = Number(es[1]);
+    const month = MONTHS[es[2]];
+    if (month == null || day < 1 || day > 31) return null;
+    return futureMonthDay(now, month, day);
+  }
+
+  return null;
+}
+
+function stripAbsoluteDate(text: string): string {
+  return text
+    .replace(new RegExp(`\\b(${MONTH_NAMES})\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, 'g'), ' ')
+    .replace(new RegExp(`\\b(\\d{1,2})\\s+de\\s+(${MONTH_NAMES})\\b`, 'g'), ' ');
+}
+
+/** Same month/day this year, or next year if that calendar day has already ended. */
+function futureMonthDay(now: number, month: number, day: number): Date {
+  const nowDate = new Date(now);
+  const date = new Date(nowDate.getFullYear(), month, day);
+  if (endOfDay(date.getTime()) < now) {
+    date.setFullYear(date.getFullYear() + 1);
+  }
+  return date;
+}
+
+function weekdayDate(dayText: string, now: number): Date | null {
+  for (const [name, weekday] of Object.entries(WEEKDAYS)) {
+    const plain = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (!new RegExp(`\\b${plain}\\b`).test(dayText)) continue;
+
+    const wantNext = /\b(next|proximo|siguiente)\b/.test(dayText);
+    const date = new Date(now);
+    let delta = (weekday - date.getDay() + 7) % 7;
+    if (delta === 0 || (wantNext && delta < 7)) delta = delta === 0 ? 7 : delta;
+    date.setDate(date.getDate() + delta);
+    return date;
+  }
+  return null;
+}
+
+/**
+ * Calendar-day window from weekday or absolute date words in a phrase.
+ * Used to filter agenda events ("the meeting this Friday").
+ */
+export function dayBoundsFromWhen(input: string, now = Date.now()): { from: number; to: number } | null {
+  if (!input) return null;
+  const dayText = withoutNamedMorning(
+    input
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim(),
+  );
+
+  const absolute = absoluteDay(dayText, now);
+  if (absolute) return { from: startOfDay(absolute.getTime()), to: endOfDay(absolute.getTime()) };
+
+  if (/\b(day after tomorrow|pasado manana)\b/.test(dayText)) {
+    const ms = now + 2 * 86_400_000;
+    return { from: startOfDay(ms), to: endOfDay(ms) };
+  }
+  if (/\b(tomorrow|manana)\b/.test(dayText)) {
+    const ms = now + 86_400_000;
+    return { from: startOfDay(ms), to: endOfDay(ms) };
+  }
+  if (/\b(today|hoy)\b/.test(dayText)) {
+    return { from: startOfDay(now), to: endOfDay(now) };
+  }
+
+  const weekday = weekdayDate(dayText, now);
+  if (weekday) return { from: startOfDay(weekday.getTime()), to: endOfDay(weekday.getTime()) };
+
+  return null;
+}
+
 export function parseWhen(input: string, now = Date.now()): ParsedWhen | null {
   if (!input) return null;
 
@@ -153,17 +293,23 @@ export function parseWhen(input: string, now = Date.now()): ParsedWhen | null {
     return { at: atTime(date, clock).getTime(), hadExplicitTime: explicit };
   }
 
-  // "next monday", "on friday", "tuesday at 3pm", "el lunes"
-  for (const [name, weekday] of Object.entries(WEEKDAYS)) {
-    const plain = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    if (!new RegExp(`\\b${plain}\\b`).test(dayText)) continue;
+  // "November 20th at 9 am", "20 de noviembre a las 9"
+  const absolute = absoluteDay(dayText, now);
+  if (absolute) {
+    // Day-of-month digits must not be read as an hour ("20 de noviembre a las 9").
+    const withoutDate = stripAbsoluteDate(text);
+    const absClock = extractTimeOfDay(withoutDate) ?? namedClock(withoutDate);
+    const absExplicit = Boolean(absClock);
+    const at = atTime(absolute, absClock).getTime();
+    if (at > now) return { at, hadExplicitTime: absExplicit };
+    absolute.setFullYear(absolute.getFullYear() + 1);
+    return { at: atTime(absolute, absClock).getTime(), hadExplicitTime: absExplicit };
+  }
 
-    const wantNext = /\b(next|proximo|siguiente)\b/.test(dayText);
-    const date = new Date(now);
-    let delta = (weekday - date.getDay() + 7) % 7;
-    if (delta === 0 || (wantNext && delta < 7)) delta = delta === 0 ? 7 : delta;
-    date.setDate(date.getDate() + delta);
-    return { at: atTime(date, clock).getTime(), hadExplicitTime: explicit };
+  // "next monday", "on friday", "tuesday at 3pm", "el lunes"
+  const weekday = weekdayDate(dayText, now);
+  if (weekday) {
+    return { at: atTime(weekday, clock).getTime(), hadExplicitTime: explicit };
   }
 
   if (/\b(today|hoy)\b/.test(dayText) || clock) {

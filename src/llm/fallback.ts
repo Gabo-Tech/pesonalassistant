@@ -44,25 +44,42 @@ function say(locale: Locale, english: string, spanish: string): string {
 
 const remembered = (locale: Locale) => say(locale, 'I will remember that.', 'Lo recordaré.');
 
-function organizeNote(text: string, locale: Locale): AssistantReply | null {
-  const filedCreate = text.match(/^(?:note|save a note|make a note)\s+in\s+(.+?)\s+that\s+(.+)$/i);
-  if (filedCreate) {
-    const folder = filedCreate[1].trim();
-    const body = filedCreate[2].trim();
+function stripQuotes(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^['"`“”‘’]+/, '')
+    .replace(/['"`“”‘’]+$/, '')
+    .trim();
+}
+
+function noteSaved(locale: Locale, body: string, folder?: string): AssistantReply {
+  const text = stripQuotes(body);
+  const title = text.slice(0, 80);
+  if (folder) {
     return {
       say: say(locale, `Saved note in ${folder}.`, `Nota guardada en ${folder}.`),
-      action: { tool: 'create_note', title: body.slice(0, 80), text: body, query: folder },
+      action: { tool: 'create_note', title, text, query: folder },
     };
   }
+  return {
+    say: say(locale, `Saved note "${title}".`, `Nota guardada "${title}".`),
+    action: { tool: 'create_note', title, text },
+  };
+}
 
-  const filedCreateEs = text.match(/^(?:anota|apunta|toma nota)\s+en\s+(.+?)\s+que\s+(.+)$/i);
+function organizeNote(text: string, locale: Locale): AssistantReply | null {
+  const filedCreate = text.match(
+    /^(?:note|save a note|make a note|create a note)\s+in\s+(.+?)\s+that\s+(.+)$/i,
+  );
+  if (filedCreate) {
+    return noteSaved(locale, filedCreate[2], filedCreate[1].trim());
+  }
+
+  const filedCreateEs = text.match(
+    /^(?:anota|apunta|toma nota|crea una nota)\s+en\s+(.+?)\s+que\s+(.+)$/i,
+  );
   if (filedCreateEs) {
-    const folder = filedCreateEs[1].trim();
-    const body = filedCreateEs[2].trim();
-    return {
-      say: say(locale, `Saved note in ${folder}.`, `Nota guardada en ${folder}.`),
-      action: { tool: 'create_note', title: body.slice(0, 80), text: body, query: folder },
-    };
+    return noteSaved(locale, filedCreateEs[2], filedCreateEs[1].trim());
   }
 
   const file = text.match(
@@ -246,31 +263,36 @@ export function matchCommand(userText: string, locale: Locale = 'en'): Assistant
   const organized = organizeNote(text, locale);
   if (organized) return organized;
 
+  // Explicit content filler: "create a note with this content 'Hi…'"
+  const noteWithContent = lower.match(
+    /^(?:create a note|make a note|save a note|take a note)\s+with(?:\s+(?:this|the))?\s+(?:content|text|body)\s*[:.]?\s+(.+)$/i,
+  );
+  if (noteWithContent) {
+    return noteSaved(locale, text.slice(text.length - noteWithContent[1].length));
+  }
+
+  const createNote = lower.match(
+    /^(?:create a note)\s+(?:that\s+|saying\s+|about\s+|:\s*)(.+)$/i,
+  );
+  if (createNote) {
+    return noteSaved(locale, text.slice(text.length - createNote[1].length));
+  }
+
   const note = lower.match(/^(?:note that|make a note|remember that)\s+(.+)/i);
   if (note) {
-    const body = text.slice(text.length - note[1].length);
-    return {
-      say: say(locale, `Saved note "${body.slice(0, 80)}".`, `Nota guardada "${body.slice(0, 80)}".`),
-      action: { tool: 'create_note', title: body.slice(0, 80), text: body },
-    };
+    return noteSaved(locale, text.slice(text.length - note[1].length));
   }
 
   const bareNote = lower.match(/^(?:note|save a note)\s+(?!that\b)(.+)/i);
   if (bareNote) {
-    const body = text.slice(text.length - bareNote[1].length);
-    return {
-      say: say(locale, `Saved note "${body.slice(0, 80)}".`, `Nota guardada "${body.slice(0, 80)}".`),
-      action: { tool: 'create_note', title: body.slice(0, 80), text: body },
-    };
+    return noteSaved(locale, text.slice(text.length - bareNote[1].length));
   }
 
-  const anota = lower.match(/^(?:anota(?: que)?|apunta(?: que)?|toma nota(?: de)?)\s+(.+)/i);
+  const anota = lower.match(
+    /^(?:anota(?: que)?|apunta(?: que)?|toma nota(?: de)?|crea una nota(?: que| con)?|guarda una nota(?: de)?)\s+(.+)/i,
+  );
   if (anota) {
-    const body = text.slice(text.length - anota[1].length);
-    return {
-      say: say(locale, `Saved note "${body.slice(0, 80)}".`, `Nota guardada "${body.slice(0, 80)}".`),
-      action: { tool: 'create_note', title: body.slice(0, 80), text: body },
-    };
+    return noteSaved(locale, text.slice(text.length - anota[1].length));
   }
 
   const alarm = text.match(
@@ -372,12 +394,22 @@ export function matchCommand(userText: string, locale: Locale = 'en'): Assistant
     return contactReply(contact[1], locale);
   }
 
-  const message = text.match(/^(?:message|text)\s+(.+?)\s+(?:that\s+)?(.+)$/i)
-    ?? text.match(/^(?:dile a|mensaje a|m[aá]ndale a|mandale a)\s+(.+?)\s+que\s+(.+)$/i);
+  const message =
+    text.match(/^(?:send|text)\s+(.+?)\s+(?:a\s+)?(?:message|text|sms)(?:\s+(?:saying|that))?\s+(.+)$/i) ??
+    text.match(/^(?:tell)\s+(.+?)\s+(?:a\s+message\s+)?(?:saying|that)\s+(.+)$/i) ??
+    text.match(/^(?:message|text)\s+(.+?)\s+(?:saying|that)\s+(.+)$/i) ??
+    text.match(/^(?:message|text)\s+(.+?)\s+(?:that\s+)?(.+)$/i) ??
+    text.match(
+      /^(?:dile a|mensaje a|m[aá]ndale a|mandale a|env[ií]a(?:le)? a|manda(?:le)? a)\s+(.+?)\s+(?:un mensaje\s+)?(?:que|diciendo)\s+(.+)$/i,
+    );
   if (message && !/whatsapp|signal/i.test(text)) {
     return {
       say: say(locale, `Message for ${message[1].trim()}.`, `Mensaje para ${message[1].trim()}.`),
-      action: { tool: 'message_contact', recipient: message[1].trim(), text: message[2].trim() },
+      action: {
+        tool: 'message_contact',
+        recipient: message[1].trim(),
+        text: stripQuotes(message[2]),
+      },
     };
   }
 
@@ -466,15 +498,37 @@ export function matchCommand(userText: string, locale: Locale = 'en'): Assistant
   const edited = editCommand(text, locale);
   if (edited) return edited;
 
-  const tweet = lower.match(/^(?:tweet|post on (?:x|twitter)|publish on (?:x|twitter))\s+(.+)/i);
+  const tweet = lower.match(
+    /^(?:tweet(?:\s+that)?|(?:publish|post)(?:\s+this)?(?:\s+(?:post|tweet))?\s+(?:on|to)\s+(?:x|twitter))\s*[:.]?\s*(.+)$/i,
+  );
   if (tweet) {
     return {
       say: say(locale, 'X draft is ready. Say send or cancel.', 'Borrador de X listo. Di enviar o cancelar.'),
-      action: { tool: 'draft_tweet', text: text.slice(text.length - tweet[1].length) },
+      action: { tool: 'draft_tweet', text: stripQuotes(text.slice(text.length - tweet[1].length)) },
     };
   }
 
+  const liveFact = matchLiveFact(text, locale);
+  if (liveFact) return liveFact;
+
   return null;
+}
+
+/** Prices, weather, and news skip the small model so a lookup always starts. */
+const LIVE_FACT =
+  /\b(price|precio|weather|forecast|clima|news|noticia|noticias|search|busca|buscar)\b|\bque tiempo hace\b/;
+
+function matchLiveFact(text: string, locale: Locale): AssistantReply | null {
+  if (/^web results for /i.test(text)) return null;
+  const folded = text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  if (!LIVE_FACT.test(folded)) return null;
+  return {
+    say: say(locale, 'Looking that up.', 'Buscando.'),
+    action: { tool: 'web_search', query: text.trim() },
+  };
 }
 
 export function fallbackAsk(userText: string, locale: Locale = 'en'): AssistantReply {
@@ -490,28 +544,70 @@ export function fallbackAsk(userText: string, locale: Locale = 'en'): AssistantR
 }
 
 function reminderReply(_text: string, rest: string, locale: Locale): AssistantReply {
-  const anchored = rest.match(
-    /^(.*?)\s+((?:right|just)\s+after|after|justo\s+despu[eé]s\s+de|despu[eé]s\s+de|tras)\s+(.+)$/i,
+  const cleaned = rest.replace(/[.?!,:;]+$/u, '').trim();
+
+  const beforeAnchor = cleaned.match(
+    /^(.*?)\s+((?:(?:a|an|una|un|\d+)\s+(?:minutes?|mins?|minutos?|hours?|hrs?|horas?)|an?\s+hour|una\s+hora)\s+(?:before|antes\s+de)\s+.+)$/i,
   );
-  if (anchored?.[1].trim()) {
+  if (beforeAnchor?.[1].trim()) {
+    const when = beforeAnchor[2].trim();
     return {
-      say: say(
-        locale,
-        `Reminder set for right after ${anchored[3].trim()}.`,
-        `Recordatorio justo después de ${anchored[3].trim()}.`,
-      ),
-      action: { tool: 'create_reminder', text: anchored[1].trim(), when: `${anchored[2]} ${anchored[3]}`.trim() },
+      say: say(locale, `Reminder set for ${when}.`, `Recordatorio para ${when}.`),
+      action: { tool: 'create_reminder', text: beforeAnchor[1].trim(), when },
     };
   }
 
-  const whenMatch = rest.match(
-    /\b(in\s+\d+\s+\w+|en\s+\d+\s+\w+|tomorrow(?:\s+at\s+.+)?|ma[nñ]ana(?:\s+a las\s+.+)?|tonight(?:\s+at\s+.+)?|esta noche(?:\s+a las\s+.+)?|today(?:\s+at\s+.+)?|hoy(?:\s+a las\s+.+)?|at\s+\d.+$|a las\s+\d.+$|on\s+\w+.*$)\b/i,
+  const bareBefore = cleaned.match(
+    /^((?:(?:a|an|una|un|\d+)\s+(?:minutes?|mins?|minutos?|hours?|hrs?|horas?)|an?\s+hour|una\s+hora)\s+(?:before|antes\s+de)\s+.+)$/i,
+  );
+  if (bareBefore) {
+    const when = bareBefore[1].trim();
+    return {
+      say: say(locale, `Reminder set for ${when}.`, `Recordatorio para ${when}.`),
+      action: { tool: 'create_reminder', text: when, when },
+    };
+  }
+
+  const anchored = cleaned.match(
+    /^(.*?)\s+((?:(?:a|an|una|un|\d+)\s+(?:minutes?|mins?|minutos?|hours?|hrs?|horas?)\s+)?(?:(?:right|just)\s+after|after|justo\s+despu[eé]s\s+de|despu[eé]s\s+de|tras)\s+.+)$/i,
+  );
+  if (anchored?.[1].trim()) {
+    const when = anchored[2].trim();
+    return {
+      say: say(
+        locale,
+        `Reminder set for ${when}.`,
+        `Recordatorio para ${when}.`,
+      ),
+      action: { tool: 'create_reminder', text: anchored[1].trim(), when },
+    };
+  }
+
+  const weekdays =
+    'monday|mon|lunes|tuesday|tue|tues|martes|wednesday|wed|miercoles|mi[eé]rcoles|thursday|thu|thurs|jueves|friday|fri|viernes|saturday|sat|sabado|s[aá]bado|sunday|sun|domingo';
+  const months =
+    'january|jan|enero|february|feb|febrero|march|mar|marzo|april|apr|abril|may|mayo|june|jun|junio|july|jul|julio|august|aug|agosto|september|sep|sept|septiembre|october|oct|octubre|november|nov|noviembre|december|dec|diciembre';
+
+  const whenMatch = cleaned.match(
+    new RegExp(
+      String.raw`\b(` +
+        String.raw`in\s+\d+\s+\w+|en\s+\d+\s+\w+|` +
+        String.raw`tomorrow(?:\s+at\s+.+)?|ma[nñ]ana(?:\s+a\s+las\s+.+)?|` +
+        String.raw`tonight(?:\s+at\s+.+)?|esta\s+noche(?:\s+a\s+las\s+.+)?|` +
+        String.raw`today(?:\s+at\s+.+)?|hoy(?:\s+a\s+las\s+.+)?|` +
+        String.raw`(?:(?:this|next|on|el|este|esta|pr[oó]ximo|siguiente)\s+)?(?:${weekdays})(?:\s+at\s+.+|\s+a\s+las\s+.+)?|` +
+        String.raw`(?:${months})\s+\d{1,2}(?:st|nd|rd|th)?(?:\s+at\s+.+|\s+a\s+las\s+.+)?|` +
+        String.raw`\d{1,2}\s+de\s+(?:${months})(?:\s+a\s+las\s+.+)?|` +
+        String.raw`at\s+\d.+|a\s+las\s+\d.+` +
+        String.raw`)`,
+      'i',
+    ),
   );
   const when = whenMatch?.[1] ?? 'in 10 minutes';
-  const task = whenMatch ? rest.slice(0, whenMatch.index).trim() : rest;
+  const task = whenMatch && whenMatch.index != null ? cleaned.slice(0, whenMatch.index).trim() : cleaned;
   return {
     say: say(locale, `Reminder set for ${when}.`, `Recordatorio para ${when}.`),
-    action: { tool: 'create_reminder', text: task || rest, when },
+    action: { tool: 'create_reminder', text: task || cleaned, when },
   };
 }
 
@@ -638,14 +734,17 @@ function matchShare(
   if (!network.test(text)) return null;
 
   const patterned = text.match(
-    /(?:send|message|text|tell|env[ií]a|escribe|dile)\s+(.+?)\s+(?:on\s+|por\s+|en\s+)?(?:whats\s?app|signal)(?:\s+that)?\s*[:,]?\s*(.+)/i,
+    /(?:send|message|text|tell|env[ií]a|escribe|dile)\s+(.+?)\s+(?:on\s+|por\s+|en\s+)?(?:whats\s?app|signal)(?:\s+(?:that|saying))?\s*[:,]?\s*(.+)/i,
   );
-  if (patterned) return { recipient: patterned[1].trim(), body: patterned[2].trim() };
+  if (patterned) return { recipient: patterned[1].trim(), body: stripQuotes(patterned[2]) };
 
-  const alt = text.match(
-    /(?:whats\s?app|signal)\s+(?:a\s+)?(.+?)\s+(?:that\s+|que\s+)?(.+)/i,
+  const sendA = text.match(
+    /(?:send\s+(?:a\s+)?|env[ií]a\s+(?:un\s+)?)(?:whats\s?app|signal)\s+(?:message\s+)?(?:to\s+|a\s+)?(.+?)\s+(?:that\s+|saying\s+|que\s+)?(.+)/i,
   );
-  if (alt) return { recipient: alt[1].trim(), body: alt[2].trim() };
+  if (sendA) return { recipient: sendA[1].trim(), body: stripQuotes(sendA[2]) };
+
+  const alt = text.match(/(?:whats\s?app|signal)\s+(?:a\s+)?(.+?)\s+(?:that\s+|saying\s+|que\s+)?(.+)/i);
+  if (alt) return { recipient: alt[1].trim(), body: stripQuotes(alt[2]) };
 
   return null;
 }

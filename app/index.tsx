@@ -269,8 +269,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  field: { flex: 1, justifyContent: 'center' },
-  placeholder: { fontSize: 15, lineHeight: 20, paddingVertical: 8 },
+  field: { flex: 1, minWidth: 0, justifyContent: 'center' },
+  placeholder: { alignSelf: 'stretch', fontSize: 15, lineHeight: 20, paddingVertical: 8 },
   typedInput: { fontSize: 15, paddingVertical: 8 },
   go: {
     minHeight: 44,
