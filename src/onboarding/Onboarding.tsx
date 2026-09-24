@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { requestRecordingPermissionsAsync } from 'expo-audio';
 import * as Device from 'expo-device';
@@ -23,6 +18,7 @@ import { useSettings } from '../settings/store';
 import { useT } from '../i18n';
 import { localeWakeWord } from '../i18n/wake';
 import { Bento, BentoLabel, Chip, GUTTER, InkSwitch, PAGE_MARGIN } from '../ui/Bento';
+import { Button } from '../ui/Button';
 import { useTheme } from '../ui/ThemeProvider';
 import { Body, Display, Meta } from '../ui/Type';
 import { loadStt } from '../voice/stt';
@@ -154,7 +150,7 @@ export function Onboarding() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: t.bg }]}>
       <View style={styles.page}>
-        <Meta>{tr('onboarding.step', { n: step + 1 })}</Meta>
+        <Body>{tr('onboarding.step', { n: step + 1 })}</Body>
 
         {step === 0 && (
           <Bento span={2} style={styles.card}>
@@ -245,16 +241,15 @@ export function Onboarding() {
               {tr('onboarding.modelsBody', { size: formatBytes(pairBytes) })}
             </Body>
             <Body style={{ marginTop: 12 }}>
-              {tr('onboarding.forThisPhone', {
-                ram: ram ? formatBytes(ram) : '…',
-              })}
-              {'\n'}
               {sttPick.label}
               {'\n'}
               {llmPick.label}
-              {heavier
-                ? `\n${tr('onboarding.heavierOptional', { name: heavier.label })}`
-                : ''}
+            </Body>
+            <Body style={{ color: t.dim, marginTop: 8 }}>
+              {tr('onboarding.forThisPhone', {
+                ram: ram ? formatBytes(ram) : '…',
+                heavier: heavier ? tr('onboarding.heavierOptional', { name: heavier.label }) : '',
+              })}
             </Body>
             {busy && (
               <View style={{ gap: 8, marginTop: 16 }}>
@@ -276,80 +271,47 @@ export function Onboarding() {
 
         <View style={styles.actions}>
           {step === 0 && (
-            <InkButton label={tr('onboarding.continue')} onPress={() => setStep(1)} />
+            <Button label={tr('onboarding.continue')} onPress={() => setStep(1)} />
           )}
 
           {step === 1 && (
             <>
               {micState !== 'granted' && (
-                <InkButton label={tr('onboarding.allowMic')} onPress={() => void askMic()} />
+                <Button label={tr('onboarding.allowMic')} onPress={() => void askMic()} />
               )}
               {micState === 'granted' ? (
-                <InkButton label={tr('onboarding.continue')} onPress={() => setStep(2)} />
+                <Button label={tr('onboarding.continue')} onPress={() => setStep(2)} />
               ) : (
-                <GhostButton label={tr('onboarding.skipMic')} onPress={() => setStep(2)} />
+                <Button label={tr('onboarding.skipMic')} onPress={() => setStep(2)} tone="secondary" />
               )}
-              <GhostButton label={tr('onboarding.back')} onPress={() => setStep(0)} />
+              <Button label={tr('onboarding.back')} onPress={() => setStep(0)} tone="secondary" />
             </>
           )}
 
           {step === 2 && (
             <>
-              <InkButton label={tr('onboarding.continue')} onPress={() => void saveWake()} />
-              <GhostButton label={tr('onboarding.back')} onPress={() => setStep(1)} />
+              <Button label={tr('onboarding.continue')} onPress={() => void saveWake()} />
+              <Button label={tr('onboarding.back')} onPress={() => setStep(1)} tone="secondary" />
             </>
           )}
 
           {step === 3 && (
             <>
               {!busy && (
-                <InkButton
+                <Button
                   label={tr('onboarding.download')}
                   onPress={() => void downloadRecommended()}
                 />
               )}
-              <GhostButton label={tr('onboarding.skip')} onPress={() => void skip()} />
-              {!busy && <GhostButton label={tr('onboarding.back')} onPress={() => setStep(2)} />}
+              <Button label={tr('onboarding.skip')} onPress={() => void skip()} tone="secondary" />
+              {!busy && (
+                <Button label={tr('onboarding.back')} onPress={() => setStep(2)} tone="secondary" />
+              )}
             </>
           )}
         </View>
       </View>
     </SafeAreaView>
-  );
-}
-
-function InkButton({ label, onPress }: { label: string; onPress: () => void }) {
-  const t = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        backgroundColor: t.inverse,
-        borderRadius: t.radiusChip,
-        paddingVertical: 14,
-        alignItems: 'center',
-      }}
-    >
-      <Meta style={{ color: t.inverseInk }}>{label}</Meta>
-    </Pressable>
-  );
-}
-
-function GhostButton({ label, onPress }: { label: string; onPress: () => void }) {
-  const t = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: t.line,
-        borderRadius: t.radiusChip,
-        paddingVertical: 14,
-        alignItems: 'center',
-      }}
-    >
-      <Meta>{label}</Meta>
-    </Pressable>
   );
 }
 

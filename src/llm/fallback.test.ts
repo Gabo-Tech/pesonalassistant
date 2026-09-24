@@ -146,6 +146,37 @@ describe('fallbackAsk', () => {
     assert.equal(spanish.action?.text, 'Trabajo');
   });
 
+  it('accepts a polite prefix and edits an event, task, or reminder', () => {
+    const polite = fallbackAsk('can you remind me to call mum tomorrow at 9');
+    assert.equal(polite.action?.tool, 'create_reminder');
+    assert.match(polite.action?.when ?? '', /tomorrow at 9/i);
+
+    const please = fallbackAsk('please add an event dentist tomorrow at 9');
+    assert.equal(please.action?.tool, 'create_event');
+
+    const moved = fallbackAsk('move the dentist to friday at 4');
+    assert.equal(moved.action?.tool, 'update_event');
+    assert.equal(moved.action?.title, 'dentist');
+    assert.match(moved.action?.when ?? '', /friday at 4/i);
+
+    const task = fallbackAsk('change the milk task to tomorrow');
+    assert.equal(task.action?.tool, 'update_task');
+    assert.equal(task.action?.title, 'milk');
+    assert.equal(task.action?.when, 'tomorrow');
+
+    const reminder = fallbackAsk('move the call mum reminder to tonight');
+    assert.equal(reminder.action?.tool, 'update_reminder');
+    assert.match(reminder.action?.title ?? '', /call mum/i);
+
+    const spanish = fallbackAsk('mueve el dentista a las 4', 'es');
+    assert.equal(spanish.action?.tool, 'update_event');
+    assert.match(spanish.action?.when ?? '', /a las 4/i);
+
+    const tarea = fallbackAsk('cambia la tarea de la leche a mañana', 'es');
+    assert.equal(tarea.action?.tool, 'update_task');
+    assert.match(tarea.action?.title ?? '', /leche/i);
+  });
+
   it('creates a Spanish note, alarm, and reminder', () => {
     const note = fallbackAsk('anota que la wifi es hunter2', 'es');
     assert.equal(note.action?.tool, 'create_note');

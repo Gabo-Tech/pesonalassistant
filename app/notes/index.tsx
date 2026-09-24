@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -28,6 +29,7 @@ import { useT } from '../../src/i18n';
 import { isInboxLabel, noteAccentNames, noteColorKey } from '../../src/notes/organize';
 import { noteSnippet } from '../../src/notes/title';
 import { Bento, Chip, GUTTER, PAGE_MARGIN } from '../../src/ui/Bento';
+import { Button } from '../../src/ui/Button';
 import { KeyboardGutter } from '../../src/ui/KeyboardGutter';
 import { noteAccents, type NoteAccent } from '../../src/ui/theme';
 import { useTheme } from '../../src/ui/ThemeProvider';
@@ -196,9 +198,12 @@ export default function NotesScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {notes.length === 0 ? (
-            <Meta style={{ textAlign: 'center', marginTop: 32 }}>
-              {searching || scope === 'all' ? tr('notes.empty') : tr('notes.folderEmpty')}
-            </Meta>
+            <View style={{ gap: 16, marginTop: 32, alignItems: 'stretch' }}>
+              <Body style={{ color: t.dim, textAlign: 'center' }}>
+                {searching || scope === 'all' ? tr('notes.empty') : tr('notes.folderEmpty')}
+              </Body>
+              {!searching ? <Button label={tr('notes.new')} onPress={openNewNote} /> : null}
+            </View>
           ) : (
             notes.map((item) => {
               const accent = item.color in noteAccents ? noteAccents[item.color as NoteAccent] : null;
@@ -223,11 +228,20 @@ export default function NotesScreen() {
                           {noteSnippet(item.body)}
                         </Body>
                       ) : null}
-                      <Body style={{ color: t.dim, fontSize: 11, lineHeight: 16 }}>
+                      <Body style={{ color: t.dim, fontSize: 13, lineHeight: 18 }}>
                         {showFolder ? `${item.folder_name ?? tr('notes.inbox')} · ` : ''}
                         {new Date(item.updated_at).toLocaleString()}
                       </Body>
                     </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={tr('notes.menu')}
+                      hitSlop={8}
+                      onPress={() => setMenu({ kind: 'note', note: item, panel: 'actions' })}
+                      style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <Ionicons name="ellipsis-horizontal" size={20} color={t.ink} />
+                    </Pressable>
                   </Bento>
                 </Pressable>
               );

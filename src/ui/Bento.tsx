@@ -9,7 +9,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { useTheme } from './ThemeProvider';
-import { Meta } from './Type';
+import { Body, Meta } from './Type';
 
 export const PAGE_MARGIN = 20;
 export const GUTTER = 12;
@@ -76,8 +76,40 @@ export function Chip({
         backgroundColor: active ? t.ink : 'transparent',
       }}
     >
-      <Meta style={{ color: active ? t.inverseInk : t.dim, letterSpacing: 1 }}>{label}</Meta>
+      <Body style={{ color: active ? t.inverseInk : t.ink, fontSize: 14, lineHeight: 18 }}>{label}</Body>
     </Pressable>
+  );
+}
+
+export function Row({
+  title,
+  subtitle,
+  onPress,
+  trailing,
+}: {
+  title: string;
+  subtitle?: string;
+  onPress?: () => void;
+  trailing?: ReactNode;
+}) {
+  const t = useTheme();
+  const body = (
+    <View style={{ flex: 1, gap: 4, justifyContent: 'center', minHeight: 44 }}>
+      <Body>{title}</Body>
+      {subtitle ? <Body style={{ color: t.dim, fontSize: 13, lineHeight: 18 }}>{subtitle}</Body> : null}
+    </View>
+  );
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      {onPress ? (
+        <Pressable onPress={onPress} style={{ flex: 1 }} accessibilityRole="button">
+          {body}
+        </Pressable>
+      ) : (
+        body
+      )}
+      {trailing}
+    </View>
   );
 }
 

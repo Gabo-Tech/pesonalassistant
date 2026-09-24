@@ -11,9 +11,23 @@ function fold(text: string): string {
     .trim();
 }
 
+const POLITE = /^(?:please|can you|could you|por favor|puedes|podrias)\b[\s,]*/;
+
+/** Drop a leading "please" / "can you" so "can you write down …" still counts. */
+function withoutPolite(text: string): string {
+  let rest = text;
+  for (let i = 0; i < 3; i += 1) {
+    const next = rest.replace(POLITE, '').trim();
+    if (next === rest) break;
+    rest = next;
+  }
+  return rest;
+}
+
 export function wantsSavedNote(text: string): boolean {
-  return /^(?:please\s+)?(?:note(?:\s+that|\s+in\s+.+?\s+that)|make a note|write (?:this|that) down|save (?:a |this )?note|take a note|anota(?:\s+que|\s+en\s+.+?\s+que)|apunta(?:\s+que|\s+en\s+.+?\s+que)|toma nota(?:\s+de)?|guarda una nota(?:\s+de|\s+en)?)\b/.test(
-    fold(text),
+  const line = withoutPolite(fold(text));
+  return /^(?:note(?:\s+that|\s+in\s+.+?\s+that)|make a note|create a note|write (?:this|that) down|write down|save (?:a |this )?note|save this|take a note|anota(?:\s+que|\s+en\s+.+?\s+que)|apunta(?:\s+que|\s+en\s+.+?\s+que)|toma nota(?:\s+de)?|guarda una nota(?:\s+de|\s+en)?|guarda esto)\b/.test(
+    line,
   );
 }
 

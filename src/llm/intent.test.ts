@@ -22,5 +22,9 @@ describe('looksLikeTask', () => {
     assert.equal(looksLikeTask('recuérdame llamar a mamá'), true);
     assert.equal(looksLikeTask('qué tiempo hace'), true);
     assert.equal(looksLikeTask('qué hay en el calendario'), true);
+    assert.equal(looksLikeTask('schedule lunch Friday'), true);
+    assert.equal(looksLikeTask('move the dentist to 4'), true);
+    assert.equal(looksLikeTask('change the milk task'), true);
+    assert.equal(looksLikeTask('send Marie I am late'), true);
   });
 });

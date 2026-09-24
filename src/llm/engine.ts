@@ -10,6 +10,7 @@ import { readCloudKey } from '../settings/secrets';
 import { fallbackAsk, matchCommand } from './fallback';
 import { looksLikeTask } from './intent';
 import { cloudReplyText, cloudRequest, type CloudProvider, type CloudTurn } from './cloud';
+import { fitMessages, promptBudget, shrinkToSystemUser, type ChatMessage } from './contextBudget';
 import { buildChatPrompt, buildSystemPrompt } from './prompt';
 import { parseReply, REPLY_SCHEMA, spokenChat, toolReplyUsable, type AssistantReply } from './tools';
 import { takeSentences } from '../voice/sentences';
@@ -63,9 +64,11 @@ export async function loadLlm(modelPath: string): Promise<void> {
       context = await initLlama(
         {
           model: modelPath,
-          // 2048 tokens is plenty for a short command plus a few turns of history,
-          // and keeps the KV cache small enough for a phone.
-          n_ctx: 1024,
+          // 4096 leaves room for the tool prompt plus a spoken paragraph.
+          // n_parallel must stay 1: each sequence gets n_ctx / n_parallel,
+          // and llama.rn uses 8 sequences when this is left at 0.
+          n_ctx: 4096,
+          n_parallel: 1,
           n_threads: 4,
           // Android GPU offload via OpenCL is still unreliable across vendors; CPU is
           // predictable and a 1.5B Q4 model is fast enough for one-shot commands.
@@ -185,15 +188,27 @@ function heavierModelPath(currentPath: string): string | null {
 async function localMessages(
   userText: string,
   systemFor: (facts: PromptFact[]) => string,
-): Promise<{ role: string; content: string }[]> {
+  nPredict: number,
+): Promise<ChatMessage[]> {
   const [history, facts] = await Promise.all([recentTurns(6), listFacts()]);
-  return [
+  const messages: ChatMessage[] = [
     { role: 'system', content: systemFor(facts) },
     ...history
       .filter((turn) => turn.role !== 'system')
       .map((turn) => ({ role: turn.role, content: turn.text })),
     { role: 'user', content: userText },
   ];
+  return fitMessages(messages, promptBudget(nPredict), countPromptTokens);
+}
+
+/** Formatted chat length, including the Qwen template, so the budget matches what is decoded. */
+async function countPromptTokens(messages: ChatMessage[]): Promise<number> {
+  if (!context) return Number.POSITIVE_INFINITY;
+  const formatted = await context.getFormattedChat(messages, null, { jinja: true });
+  const prompt = formatted.prompt ?? '';
+  if (!prompt) return Number.POSITIVE_INFINITY;
+  const result = await context.tokenize(prompt);
+  return result.tokens.length;
 }
 
 async function completeChat(
@@ -203,8 +218,10 @@ async function completeChat(
 ): Promise<AssistantReply> {
   if (!context) return fallbackAsk(userText, locale);
 
-  const messages = await localMessages(userText, (facts) =>
-    buildChatPrompt(Date.now(), facts, locale, true),
+  let messages = await localMessages(
+    userText,
+    (facts) => buildChatPrompt(Date.now(), facts, locale, true),
+    48,
   );
   let buffer = '';
   let emitted = 0;
@@ -225,7 +242,7 @@ async function completeChat(
     if (flush && rest.trim()) onSentence(rest.trim());
   };
 
-  const result = await context.completion(
+  let result = await context.completion(
     {
       messages,
       jinja: true,
@@ -240,6 +257,26 @@ async function completeChat(
     },
   );
 
+  if (result.context_full && !buffer.trim()) {
+    messages = await fitMessages(shrinkToSystemUser(messages), promptBudget(48), countPromptTokens);
+    buffer = '';
+    emitted = 0;
+    result = await context.completion(
+      {
+        messages,
+        jinja: true,
+        temperature: 0.3,
+        top_p: 0.9,
+        n_predict: 48,
+      },
+      (data: TokenData) => {
+        if (typeof data.accumulated_text === 'string') buffer = data.accumulated_text;
+        else buffer += data.token ?? '';
+        emit(buffer, false);
+      },
+    );
+  }
+
   const raw = result.text || result.content || buffer;
   emit(raw, true);
   return { say: spokenChat(raw) };
@@ -248,22 +285,30 @@ async function completeChat(
 async function completeTool(userText: string, locale: 'en' | 'es'): Promise<string> {
   if (!context) return '';
 
-  const messages = await localMessages(userText, (facts) =>
-    buildSystemPrompt(Date.now(), facts, locale, true),
+  let messages = await localMessages(
+    userText,
+    (facts) => buildSystemPrompt(Date.now(), facts, locale, true),
+    128,
   );
 
-  const result = await context.completion({
+  const params = {
     messages,
     jinja: true,
     response_format: {
-      type: 'json_schema',
+      type: 'json_schema' as const,
       json_schema: { strict: true, schema: REPLY_SCHEMA as unknown as object },
     },
     // Low but non-zero: deterministic enough to follow the format, not robotic.
     temperature: 0.1,
     top_p: 0.9,
     n_predict: 128,
-  });
+  };
+
+  let result = await context.completion(params);
+  if (result.context_full && !(result.text || result.content)) {
+    messages = await fitMessages(shrinkToSystemUser(messages), promptBudget(128), countPromptTokens);
+    result = await context.completion({ ...params, messages });
+  }
 
   return result.text || result.content || '';
 }

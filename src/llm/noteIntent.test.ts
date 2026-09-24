@@ -14,6 +14,10 @@ describe('wantsSavedNote', () => {
     assert.equal(wantsSavedNote('guarda una nota de la reunión'), true);
     assert.equal(wantsSavedNote('note in Work that the wifi password is hunter2'), true);
     assert.equal(wantsSavedNote('anota en Trabajo que la wifi es hunter2'), true);
+    assert.equal(wantsSavedNote('create a note about the meeting'), true);
+    assert.equal(wantsSavedNote('write down the wifi password'), true);
+    assert.equal(wantsSavedNote('can you write down the wifi password'), true);
+    assert.equal(wantsSavedNote('save this: hunter2'), true);
   });
 });
 

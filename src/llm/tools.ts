@@ -18,13 +18,16 @@ export const TOOL_NAMES = [
   'mark_note',
   'create_event',
   'list_events',
+  'update_event',
   'delete_event',
   'create_reminder',
   'list_reminders',
+  'update_reminder',
   'complete_reminder',
   'delete_reminder',
   'create_task',
   'list_tasks',
+  'update_task',
   'complete_task',
   'delete_task',
   'brief',
@@ -109,14 +112,8 @@ export const SHARE_TOOLS: ReadonlySet<ToolName> = new Set([
   'call_contact',
 ]);
 
-/** Tools that write to the device and get a lightweight confirm. */
-export const WRITE_TOOLS: ReadonlySet<ToolName> = new Set([
-  'create_event',
-  'create_reminder',
-  'create_task',
-  'create_alarm',
-  'create_contact',
-]);
+/** Local contact saves still ask before writing. Agenda writes run immediately. */
+export const WRITE_TOOLS: ReadonlySet<ToolName> = new Set(['create_contact']);
 
 /** Chat replies are prose. If the model still emits JSON, speak only the say field. */
 export function spokenChat(raw: string): string {

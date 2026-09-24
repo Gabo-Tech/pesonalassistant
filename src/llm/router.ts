@@ -1,5 +1,5 @@
 import { parseAlertMinutes, parseAllDay, parseEventRepeat } from '../calendar/expand';
-import { deleteEvent, createEvent, listEvents } from '../calendar/events';
+import { deleteEvent, createEvent, listEvents, updateEvent } from '../calendar/events';
 import { briefWindow, buildBrief } from '../agenda/brief';
 import { alarmSearchText, cancelAlarm, createAlarm, listAlarms } from '../db/alarms';
 import { deleteFactByTitle, listFacts, upsertFact } from '../db/facts';
@@ -9,6 +9,7 @@ import {
   createLocalEvent,
   deleteLocalEvent,
   listOccurrences,
+  updateLocalEvent,
 } from '../db/localEvents';
 import {
   appendToNote,
@@ -21,8 +22,8 @@ import {
   setNoteMark,
   type Note,
 } from '../db/notes';
-import { completeReminder, createReminder, deleteReminder, listReminders } from '../db/reminders';
-import { completeTask, createTask, deleteTask, listTasks } from '../db/tasks';
+import { completeReminder, createReminder, deleteReminder, listReminders, updateReminder } from '../db/reminders';
+import { completeTask, createTask, deleteTask, listTasks, updateTask } from '../db/tasks';
 import { t } from '../i18n';
 import { localeTag } from '../i18n/wake';
 import { isInboxLabel, noteColorKey, parseNoteMark } from '../notes/organize';
@@ -195,7 +196,7 @@ export async function routeAction(
       return ok(t('router.noteUnpinned', { title: named.title }));
     }
 
-    /* ---------------- reminders and events: confirm before writing ---------------- */
+    /* ---------------- reminders, tasks, events, alarms: write immediately ---------------- */
     case 'create_reminder': {
       const text = action.text?.trim() || action.title?.trim();
       if (!text) return ok(t('router.remindWhat'));
@@ -212,42 +213,16 @@ export async function routeAction(
         const at = new Date(resolved.at);
         const clock = clockLabel(at.getHours(), at.getMinutes());
         const anchorEventId = usesPhoneCalendar() ? null : Number(resolved.eventId);
-        requestConfirm(
-          {
-            kind: 'reminder',
-            summary: t('router.reminderSummary', { when: clock }),
-            detail: text,
-            speech: t('router.reminderAfterSpeech', { when: clock, title: resolved.title }),
-            confirmLabel: t('common.create'),
-            execute: async () => {
-              await createReminder(text, resolved.at, anchorEventId);
-              return t('router.reminderAfterSet', { when: clock, title: resolved.title });
-            },
-          },
-          timeout,
-        );
-        return pending(t('router.reminderAfterAsk', { when: clock, title: resolved.title }));
+        await createReminder(text, resolved.at, anchorEventId);
+        return ok(t('router.reminderAfterSet', { when: clock, title: resolved.title }));
       }
 
       const when = parseWhen(whenRaw);
       if (!when) return ok(t('router.remindWhen'));
 
       const label = whenLabel(when.at);
-      requestConfirm(
-        {
-          kind: 'reminder',
-          summary: t('router.reminderSummary', { when: label }),
-          detail: text,
-          speech: t('router.reminderSpeech', { when: label }),
-          confirmLabel: t('common.create'),
-          execute: async () => {
-            await createReminder(text, when.at, null, parseReminderRepeat(whenRaw));
-            return t('router.reminderSet', { when: label });
-          },
-        },
-        timeout,
-      );
-      return pending(t('router.reminderAsk', { when: label }));
+      await createReminder(text, when.at, null, parseReminderRepeat(whenRaw));
+      return ok(t('router.reminderSet', { when: label }));
     }
 
     case 'list_reminders': {
@@ -292,28 +267,35 @@ export async function routeAction(
       return ok(t('router.reminderDeleted'));
     }
 
+    case 'update_reminder': {
+      const query = action.title?.trim() || action.query?.trim() || '';
+      if (!query && !action.id) return ok(t('router.whichReminder'));
+      const rows = await listReminders();
+      const match = action.id
+        ? rows.find((row) => row.id === action.id)
+        : findUniqueMatch(rows, query, (row) => row.text);
+      if (!match) return ok(t('router.whichReminder'));
+      const nextText = action.text?.trim() || match.text;
+      const when = action.when?.trim() ? parseWhen(action.when) : null;
+      if (action.when?.trim() && !when) return ok(t('router.remindWhen'));
+      if (when && when.at <= Date.now()) return ok(t('router.reminderPast'));
+      if (!action.text?.trim() && !when) return ok(t('router.remindWhen'));
+      const updated = await updateReminder(match.id, {
+        text: nextText,
+        dueAt: when?.at,
+        repeat: action.when?.trim() ? parseReminderRepeat(action.when) : undefined,
+      });
+      return ok(t('router.reminderUpdated', { when: whenLabel(updated.due_at) }));
+    }
+
     case 'create_task': {
       const title = action.title?.trim() || action.text?.trim();
       if (!title) return ok(t('router.taskWhat'));
       const due = action.when ? parseWhen(action.when) : null;
       if (action.when && !due) return ok(t('router.remindWhen'));
       const priority = action.priority === 1 ? 1 : 0;
-      const whenText = due ? whenLabel(due.at) : t('router.taskNoDue');
-      requestConfirm(
-        {
-          kind: 'reminder',
-          summary: t('router.taskSummary', { title }),
-          detail: whenText,
-          speech: t('router.taskSpeech', { title, when: whenText }),
-          confirmLabel: t('common.create'),
-          execute: async () => {
-            await createTask({ title, dueAt: due?.at ?? null, priority });
-            return t('router.taskAdded', { title });
-          },
-        },
-        timeout,
-      );
-      return pending(t('router.taskAsk', { title }));
+      await createTask({ title, dueAt: due?.at ?? null, priority });
+      return ok(t('router.taskAdded', { title }));
     }
 
     case 'list_tasks': {
@@ -354,6 +336,28 @@ export async function routeAction(
       return ok(t('router.taskDeleted'));
     }
 
+    case 'update_task': {
+      const query = action.title?.trim() || action.query?.trim() || '';
+      if (!query && !action.id) return ok(t('router.whichTask'));
+      const rows = await listTasks('open');
+      const match = action.id
+        ? rows.find((row) => row.id === action.id)
+        : findUniqueMatch(rows, query, (row) => row.title);
+      if (!match) return ok(t('router.whichTask'));
+      const nextTitle = action.text?.trim() || match.title;
+      const due = action.when?.trim() ? parseWhen(action.when) : null;
+      if (action.when?.trim() && !due) return ok(t('router.remindWhen'));
+      if (!action.text?.trim() && !action.when?.trim() && action.priority !== 1) {
+        return ok(t('router.whichTask'));
+      }
+      await updateTask(match.id, {
+        title: nextTitle,
+        dueAt: due ? due.at : undefined,
+        priority: action.priority === 1 ? 1 : undefined,
+      });
+      return ok(t('router.taskUpdated', { title: nextTitle }));
+    }
+
     case 'brief': {
       const window = briefWindow(action.when ?? 'this week');
       const [events, reminders, tasks] = await Promise.all([
@@ -385,35 +389,16 @@ export async function routeAction(
       const repeat = parseRepeat(action.when ?? '');
       const clock = clockLabel(hour, minute);
       const label = action.text?.trim() || action.title?.trim() || '';
-      const summary =
-        repeat === 'daily' ? t('router.alarmDaily', { clock }) : t('router.alarmOnce', { clock });
-
-      requestConfirm(
-        {
-          kind: 'alarm',
-          summary,
-          detail: label || clock,
-          speech: t('router.alarmSpeech', {
-            kind: repeat === 'daily' ? t('router.alarmDailyKind') : t('router.alarmOnceKind'),
-            clock,
-          }),
-          confirmLabel: t('common.create'),
-          execute: async () => {
-            await createAlarm({
-              label,
-              hour,
-              minute,
-              repeat,
-              nextAt: when.at,
-            });
-            return repeat === 'daily'
-              ? t('router.alarmDailySet', { clock })
-              : t('router.alarmOnceSet', { clock });
-          },
-        },
-        timeout,
+      await createAlarm({
+        label,
+        hour,
+        minute,
+        repeat,
+        nextAt: when.at,
+      });
+      return ok(
+        repeat === 'daily' ? t('router.alarmDailySet', { clock }) : t('router.alarmOnceSet', { clock }),
       );
-      return pending(t('router.alarmAsk', { summary }));
     }
 
     case 'list_alarms': {
@@ -470,25 +455,12 @@ export async function routeAction(
       }
       const label = whenLabel(start);
 
-      requestConfirm(
-        {
-          kind: 'calendar',
-          summary: t('router.eventSummary', { when: label }),
-          detail: t('router.eventDetail', { title, minutes: allDay ? 24 * 60 : minutes }),
-          speech: t('router.eventSpeech', { title, when: label }),
-          confirmLabel: t('common.create'),
-          execute: async () => {
-            if (usesPhoneCalendar()) {
-              await createEvent({ title, start, end });
-            } else {
-              await createLocalEvent({ title, start, end, allDay, repeat, alertMinutes });
-            }
-            return t('router.eventAdded', { title, when: label });
-          },
-        },
-        timeout,
-      );
-      return pending(t('router.eventAsk', { title, when: label }));
+      if (usesPhoneCalendar()) {
+        await createEvent({ title, start, end });
+      } else {
+        await createLocalEvent({ title, start, end, allDay, repeat, alertMinutes });
+      }
+      return ok(t('router.eventAdded', { title, when: label }));
     }
 
     case 'list_events': {
@@ -527,6 +499,36 @@ export async function routeAction(
       if (usesPhoneCalendar()) await deleteEvent(match.id);
       else await deleteLocalEvent(Number(match.id));
       return ok(t('router.eventDeleted'));
+    }
+
+    case 'update_event': {
+      const query = action.title?.trim() || action.query?.trim() || '';
+      if (!query && !action.id) return ok(t('router.whichEvent'));
+      const now = Date.now();
+      const events = await (usesPhoneCalendar()
+        ? listEvents(now, now + 30 * 86_400_000)
+        : loadSpan(now, now + 30 * 86_400_000));
+      const match = action.id
+        ? events.find((event) => event.id === String(action.id))
+        : findUniqueMatch(events, query, (event) => event.title);
+      if (!match) return ok(t('router.whichEvent'));
+      const nextTitle = action.text?.trim() || match.title;
+      const when = action.when?.trim() ? parseWhen(action.when) : null;
+      if (action.when?.trim() && !when) return ok(t('router.eventWhen'));
+      if (!action.text?.trim() && !when && action.duration_minutes == null) {
+        return ok(t('router.eventWhen'));
+      }
+      const span = action.duration_minutes
+        ? action.duration_minutes * 60_000
+        : Math.max(match.end - match.start, 60_000);
+      const start = when?.at ?? match.start;
+      const end = when || action.duration_minutes != null ? start + span : match.end;
+      if (usesPhoneCalendar()) {
+        await updateEvent(match.id, { title: nextTitle, start, end });
+      } else {
+        await updateLocalEvent(Number(match.id), { title: nextTitle, start, end });
+      }
+      return ok(t('router.eventUpdated', { title: nextTitle, when: whenLabel(start) }));
     }
 
     /* ---------------- facts: local and reversible, so no confirm ---------------- */

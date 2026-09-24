@@ -73,8 +73,9 @@ export async function transcribe(samples: Float32Array): Promise<string> {
   const { promise } = context.transcribeData(buffer, {
     language,
     maxThreads: 4,
-    // No timestamps, no context carry-over: each command is independent.
+    // No timestamps, and no earlier transcript in the decoder prompt.
     tokenTimestamps: false,
+    maxContext: 0,
     translate: false,
   });
 

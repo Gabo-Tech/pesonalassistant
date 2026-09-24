@@ -12,10 +12,11 @@ import {
   type PreferredChannel,
 } from '../src/db/contacts';
 import { useT } from '../src/i18n';
-import { Bento, Chip, GUTTER, PAGE_MARGIN } from '../src/ui/Bento';
+import { Bento, Chip, GUTTER, PAGE_MARGIN, Row } from '../src/ui/Bento';
+import { Button, TextAction } from '../src/ui/Button';
 import { KeyboardGutter } from '../src/ui/KeyboardGutter';
 import { useTheme } from '../src/ui/ThemeProvider';
-import { Body, Display, Meta } from '../src/ui/Type';
+import { Body, Meta } from '../src/ui/Type';
 
 type Draft = { id?: number; name: string; phone: string; notes: string; preferred: PreferredChannel };
 
@@ -53,6 +54,13 @@ export default function PeopleScreen() {
   };
 
   const importPhone = async () => {
+    Alert.alert(tr('people.import'), tr('people.importConfirm'), [
+      { text: tr('common.cancel'), style: 'cancel' },
+      { text: tr('people.import'), onPress: () => void runImport() },
+    ]);
+  };
+
+  const runImport = async () => {
     if (Platform.OS === 'android') {
       const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.READ_CONTACTS);
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
@@ -75,15 +83,14 @@ export default function PeopleScreen() {
   return (
     <KeyboardGutter style={{ backgroundColor: t.bg }}>
       <ScrollView style={{ flex: 1, backgroundColor: t.bg }} contentContainerStyle={styles.content}>
-        <View style={styles.head}>
-          <Display style={{ fontSize: 28 }}>{tr('people.title')}</Display>
-          <Pressable onPress={() => setDraft({ name: '', phone: '', notes: '', preferred: 'whatsapp' })} hitSlop={8}>
-            <Meta style={{ color: t.ink }}>{tr('people.add')}</Meta>
-          </Pressable>
+        <View style={{ width: '100%', gap: 8 }}>
+          <Button
+            label={tr('people.add')}
+            onPress={() => setDraft({ name: '', phone: '', notes: '', preferred: 'whatsapp' })}
+          />
+          <Button label={tr('people.import')} onPress={() => void importPhone()} tone="secondary" />
+          <Body style={{ color: t.dim }}>{tr('people.importHint')}</Body>
         </View>
-        <Pressable onPress={() => void importPhone()}>
-          <Meta style={{ color: t.ink }}>{tr('people.import')}</Meta>
-        </Pressable>
         {notice ? <Body style={{ color: t.dim, width: '100%' }}>{notice}</Body> : null}
         {draft && draft.id == null ? (
           <Bento span={2} style={{ gap: 10 }}>
@@ -92,51 +99,45 @@ export default function PeopleScreen() {
         ) : null}
         {people.length === 0 && !draft ? (
           <Bento span={2}>
-            <Meta>{tr('people.none')}</Meta>
+            <Body style={{ color: t.dim }}>{tr('people.none')}</Body>
           </Bento>
         ) : null}
         {people.map((person) => {
           const editing = draft?.id === person.id;
           return (
-            <Bento key={person.id} span={2} style={editing ? { gap: 10 } : styles.row}>
+            <Bento key={person.id} span={2} style={{ gap: 10 }}>
               {editing && draft ? (
                 <ContactEditor draft={draft} onChange={setDraft} onCancel={() => setDraft(null)} onSave={() => void save()} />
               ) : (
-                <>
-                  <Pressable
-                    style={{ flex: 1, gap: 6 }}
-                    onPress={() =>
-                      setDraft({
-                        id: person.id,
-                        name: person.name,
-                        phone: person.phone,
-                        notes: person.notes,
-                        preferred: person.preferred,
-                      })
-                    }
-                  >
-                    <Body>{person.name}</Body>
-                    <Meta>
-                      {tr(`people.${person.preferred}`)}
-                      {person.phone ? ` · ${person.phone}` : ''}
-                    </Meta>
-                  </Pressable>
-                  <Pressable
-                    hitSlop={10}
-                    onPress={() => {
-                      Alert.alert(tr('common.delete'), tr('people.delete'), [
-                        { text: tr('common.cancel'), style: 'cancel' },
-                        {
-                          text: tr('common.delete'),
-                          style: 'destructive',
-                          onPress: () => void deleteContact(person.id).then(refresh),
-                        },
-                      ]);
-                    }}
-                  >
-                    <Meta>{tr('common.delete')}</Meta>
-                  </Pressable>
-                </>
+                <Row
+                  title={person.name}
+                  subtitle={`${tr(`people.${person.preferred}`)}${person.phone ? ` · ${person.phone}` : ''}`}
+                  onPress={() =>
+                    setDraft({
+                      id: person.id,
+                      name: person.name,
+                      phone: person.phone,
+                      notes: person.notes,
+                      preferred: person.preferred,
+                    })
+                  }
+                  trailing={
+                    <TextAction
+                      label={tr('common.delete')}
+                      danger
+                      onPress={() => {
+                        Alert.alert(tr('common.delete'), tr('people.delete'), [
+                          { text: tr('common.cancel'), style: 'cancel' },
+                          {
+                            text: tr('common.delete'),
+                            style: 'destructive',
+                            onPress: () => void deleteContact(person.id).then(refresh),
+                          },
+                        ]);
+                      }}
+                    />
+                  }
+                />
               )}
             </Bento>
           );
@@ -157,7 +158,6 @@ function ContactEditor({
   onCancel: () => void;
   onSave: () => void;
 }) {
-  const t = useTheme();
   const tr = useT();
   return (
     <>
@@ -175,17 +175,8 @@ function ContactEditor({
           />
         ))}
       </View>
-      <View style={styles.row}>
-        <Pressable onPress={onCancel} style={{ flex: 1, paddingVertical: 10 }}>
-          <Meta>{tr('common.cancel')}</Meta>
-        </Pressable>
-        <Pressable
-          onPress={onSave}
-          style={{ flex: 1, backgroundColor: t.inverse, borderRadius: t.radiusChip, paddingVertical: 12, alignItems: 'center' }}
-        >
-          <Meta style={{ color: t.inverseInk }}>{tr('common.save')}</Meta>
-        </Pressable>
-      </View>
+      <Button label={tr('common.save')} onPress={onSave} />
+      <Button label={tr('common.cancel')} onPress={onCancel} tone="secondary" />
     </>
   );
 }

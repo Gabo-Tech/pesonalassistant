@@ -265,6 +265,7 @@ class VoiceSession {
       // Same tail as say(): keep the mic deaf briefly so the speaker is not transcribed.
       setTimeout(() => {
         if (shouldIgnoreAsync(gen, this.generation, this.snapshot.state)) return;
+        if (getGateState().pending) resumeExpiry();
         const next = resumeAfterSpeech({
           sessionOff: this.snapshot.state === 'off',
           gatePending: Boolean(getGateState().pending),
@@ -307,6 +308,7 @@ class VoiceSession {
 
     await addTurn('assistant', routed.message);
     this.busy = false;
+    if (routed.awaitingConfirm) pauseExpiry();
 
     if (spoken.length === 0) {
       this.say(routed.message, afterCommandResume(routed.awaitingConfirm), gen);
@@ -400,6 +402,7 @@ class VoiceSession {
 
     const finish = (): void => {
       if (shouldIgnoreAsync(gen, this.generation, this.snapshot.state)) return;
+      if (getGateState().pending) resumeExpiry();
       const next = resumeAfterSpeech({
         sessionOff: this.snapshot.state === 'off',
         gatePending: Boolean(getGateState().pending),

@@ -1,6 +1,6 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { AgendaScroll, Field, FormActions, FormError, SectionHead, agendaStyles } from '../../src/agenda/forms';
 import { draftSeed, firstParam, resolveDraftInstant } from '../../src/agenda/when';
 import { completeTask, createTask, deleteTask, listTasks, updateTask, type Task } from '../../src/db/tasks';
@@ -8,7 +8,8 @@ import { useT } from '../../src/i18n';
 import { localeTag } from '../../src/i18n/wake';
 import { formatWhen } from '../../src/llm/time';
 import { useSettings } from '../../src/settings/store';
-import { Bento, InkSwitch } from '../../src/ui/Bento';
+import { Bento, InkSwitch, Row } from '../../src/ui/Bento';
+import { TextAction } from '../../src/ui/Button';
 import { useTheme } from '../../src/ui/ThemeProvider';
 import { Body, Meta } from '../../src/ui/Type';
 
@@ -140,6 +141,7 @@ export default function TasksScreen() {
             value={taskDraft.when}
             onChange={(when) => setTaskDraft({ ...taskDraft, when })}
             placeholder={tr('agenda.whenHint')}
+            hint={tr('agenda.whenHint')}
           />
           <View style={agendaStyles.row}>
             <Body style={{ flex: 1 }}>{tr('agenda.important')}</Body>
@@ -153,13 +155,14 @@ export default function TasksScreen() {
       )}
       {tasks.length === 0 && !taskDraft && (
         <Bento span={2}>
-          <Meta>{tr('agenda.noneTasks')}</Meta>
+          <Body style={{ color: t.dim }}>{tr('agenda.noneTasks')}</Body>
         </Bento>
       )}
       {tasks.map((task) => (
-        <Bento key={task.id} span={2} style={agendaStyles.row}>
-          <Pressable
-            style={{ flex: 1, gap: 6 }}
+        <Bento key={task.id} span={2}>
+          <Row
+            title={task.title}
+            subtitle={`${task.priority === 1 ? `${tr('agenda.important')} · ` : ''}${task.due_at ? formatWhen(task.due_at, loc) : task.notes}`}
             onPress={() => {
               const label = task.due_at ? formatWhen(task.due_at, loc) : '';
               setTaskDraft({
@@ -173,35 +176,26 @@ export default function TasksScreen() {
               });
               setFormError(null);
             }}
-          >
-            <Body>{task.title}</Body>
-            <Meta>
-              {task.priority === 1 ? `${tr('agenda.important')} · ` : ''}
-              {task.due_at ? formatWhen(task.due_at, loc) : task.notes}
-            </Meta>
-          </Pressable>
-          <Pressable
-            onPress={() => void completeTask(task.id).then(refresh)}
-            hitSlop={10}
-            style={{ justifyContent: 'center' }}
-          >
-            <Meta style={{ color: t.ink }}>{tr('common.done')}</Meta>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              Alert.alert(tr('common.delete'), tr('agenda.deleteTask'), [
-                { text: tr('common.cancel'), style: 'cancel' },
-                {
-                  text: tr('common.delete'),
-                  style: 'destructive',
-                  onPress: () => void deleteTask(task.id).then(refresh),
-                },
-              ]);
-            }}
-            hitSlop={10}
-          >
-            <Meta>{tr('common.delete')}</Meta>
-          </Pressable>
+            trailing={
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <TextAction label={tr('common.done')} onPress={() => void completeTask(task.id).then(refresh)} />
+                <TextAction
+                  label={tr('common.delete')}
+                  danger
+                  onPress={() => {
+                    Alert.alert(tr('common.delete'), tr('agenda.deleteTask'), [
+                      { text: tr('common.cancel'), style: 'cancel' },
+                      {
+                        text: tr('common.delete'),
+                        style: 'destructive',
+                        onPress: () => void deleteTask(task.id).then(refresh),
+                      },
+                    ]);
+                  }}
+                />
+              </View>
+            }
+          />
         </Bento>
       ))}
     </AgendaScroll>

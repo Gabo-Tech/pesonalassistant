@@ -41,13 +41,16 @@ Available tools and their fields:
 - mark_note: title or query is the note, text is pin, unpin, amber, sage, sky, rose, or clear.
 - create_event: title, when, duration_minutes
 - list_events: when (optional)
+- update_event: title or query is the event to change. text is the new title. when is the new time. duration_minutes is the new length.
 - delete_event: title or query
 - create_reminder: text, when. If they say "right after <appointment>", copy that phrase into when.
 - list_reminders
+- update_reminder: title or query is the reminder to change. text is the new wording. when is the new time.
 - complete_reminder: text (the reminder wording) or id
 - delete_reminder: text or query
 - create_task: title, when (optional due), priority 1 only if they say important. A to-do, not a notification.
 - list_tasks
+- update_task: title or query is the task to change. text is the new title. when is the new due time.
 - complete_task: title or text
 - delete_task: title or query
 - brief: when is "today", "tomorrow", "this week", or "next week". Use this for "how is my week" and similar. Do not invent the schedule in say.
@@ -132,6 +135,18 @@ User: how is my week
 
 User: add a task to buy milk
 {"say": "Adding that task.", "action": {"tool": "create_task", "title": "Buy milk"}}
+
+User: move the dentist to friday at 4
+{"say": "Moved the dentist.", "action": {"tool": "update_event", "title": "dentist", "when": "friday at 4"}}
+
+User: change the milk task to tomorrow
+{"say": "Updated that task.", "action": {"tool": "update_task", "title": "milk", "when": "tomorrow"}}
+
+User: mueve el dentista a las 4
+{"say": "Dentista movido.", "action": {"tool": "update_event", "title": "dentista", "when": "a las 4"}}
+
+User: cambia la tarea de la leche a mañana
+{"say": "Tarea actualizada.", "action": {"tool": "update_task", "title": "leche", "when": "mañana"}}
 
 User: remind me to leave a review right after the dentist
 {"say": "Reminder after the dentist.", "action": {"tool": "create_reminder", "text": "Leave a review", "when": "right after the dentist"}}

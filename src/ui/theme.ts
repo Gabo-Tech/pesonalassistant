@@ -13,6 +13,7 @@ export type Palette = {
   inverseInk: string;
   good: string;
   bad: string;
+  danger: string;
   radius: number;
   radiusChip: number;
 };
@@ -27,6 +28,7 @@ export const darkPalette: Palette = {
   inverseInk: '#0C0C0C',
   good: '#D8D8D8',
   bad: '#5A5A5A',
+  danger: '#A65D5D',
   radius: 20,
   radiusChip: 12,
 };
@@ -41,6 +43,7 @@ export const lightPalette: Palette = {
   inverseInk: '#F6F3EE',
   good: '#171717',
   bad: '#6F6B66',
+  danger: '#8C4A4A',
   radius: 20,
   radiusChip: 12,
 };

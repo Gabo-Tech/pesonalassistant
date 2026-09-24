@@ -20,6 +20,7 @@ import { localeTag } from '../../src/i18n/wake';
 import { formatWhen } from '../../src/llm/time';
 import { useSettings } from '../../src/settings/store';
 import { Bento, Chip, PAGE_MARGIN } from '../../src/ui/Bento';
+import { Button } from '../../src/ui/Button';
 import { useTheme } from '../../src/ui/ThemeProvider';
 import { Body, Display, Meta } from '../../src/ui/Type';
 
@@ -213,20 +214,14 @@ export default function CalendarScreen() {
       ) : null}
 
       <Display style={{ fontSize: 22, lineHeight: 28, width: '100%' }}>{dayTitle}</Display>
-      <View style={agendaStyles.chips}>
-        <Pressable onPress={() => addOnDay('event')} hitSlop={6}>
-          <Meta style={{ color: t.ink }}>{tr('agenda.addEvent')}</Meta>
-        </Pressable>
-        <Pressable onPress={() => addOnDay('task')} hitSlop={6}>
-          <Meta style={{ color: t.ink }}>{tr('agenda.addTask')}</Meta>
-        </Pressable>
-        <Pressable onPress={() => addOnDay('reminder')} hitSlop={6}>
-          <Meta style={{ color: t.ink }}>{tr('agenda.addReminder')}</Meta>
-        </Pressable>
+      <View style={{ width: '100%', gap: 8 }}>
+        <Button tone="secondary" label={tr('agenda.addEvent')} onPress={() => addOnDay('event')} />
+        <Button tone="secondary" label={tr('agenda.addTask')} onPress={() => addOnDay('task')} />
+        <Button tone="secondary" label={tr('agenda.addReminder')} onPress={() => addOnDay('reminder')} />
       </View>
       {selectedItems.length === 0 ? (
         <Bento span={2}>
-          <Meta>{tr('agenda.noneDay')}</Meta>
+          <Body style={{ color: t.dim }}>{tr('agenda.noneDay')}</Body>
         </Bento>
       ) : (
         selectedItems.map((item) => (

@@ -1,8 +1,8 @@
-import { Pressable, StyleSheet, View } from 'react-native';
 import { useT } from '../i18n';
 import { useTheme } from './ThemeProvider';
 import { Bento, BentoLabel } from './Bento';
-import { Body, Meta } from './Type';
+import { Button } from './Button';
+import { Body } from './Type';
 import type { Pending } from '../share/confirmGate';
 
 /**
@@ -33,47 +33,16 @@ export function ConfirmCard({
       <Body>{pending.summary}</Body>
       <Body style={{ color: t.dim }}>{pending.detail}</Body>
 
-      <View style={styles.row}>
-        <Pressable
-          style={[
-            styles.button,
-            {
-              borderRadius: t.radiusChip,
-              borderWidth: StyleSheet.hairlineWidth,
-              borderColor: t.line,
-              backgroundColor: 'transparent',
-            },
-          ]}
-          onPress={onCancel}
-        >
-          <Meta style={{ color: t.dim }}>{tr('common.cancel')}</Meta>
-        </Pressable>
-        <Pressable
-          style={[
-            styles.button,
-            {
-              borderRadius: t.radiusChip,
-              backgroundColor: t.inverse,
-            },
-          ]}
-          onPress={onConfirm}
-        >
-          <Meta style={{ color: t.inverseInk }}>{pending.confirmLabel}</Meta>
-        </Pressable>
-      </View>
+      <Button label={pending.confirmLabel} onPress={onConfirm} />
+      <Button label={tr('common.cancel')} onPress={onCancel} tone="secondary" />
 
-      <Meta>
+      <Body style={{ color: t.dim, fontSize: 13, lineHeight: 18 }}>
         {voiceHint && micReady
           ? tr('voice.confirmTapOrSay')
           : voiceHint
             ? tr('voice.confirmTapOrType')
             : tr('voice.confirmOff')}
-      </Meta>
+      </Body>
     </Bento>
   );
 }
-
-const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: 10, marginTop: 4 },
-  button: { flex: 1, paddingVertical: 14, alignItems: 'center' },
-});

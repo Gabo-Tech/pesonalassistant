@@ -142,8 +142,21 @@ function organizeNote(text: string, locale: Locale): AssistantReply | null {
   return null;
 }
 
+const POLITE = /^(?:please|can you|could you|por favor|puedes|podrias|podrías)\b[\s,]*/i;
+
+/** So "can you remind me…" hits the same parsers as "remind me…". */
+function stripPolite(raw: string): string {
+  let text = raw.trim();
+  for (let i = 0; i < 3; i += 1) {
+    const next = text.replace(POLITE, '').trim();
+    if (next === text) break;
+    text = next;
+  }
+  return text;
+}
+
 export function matchCommand(userText: string, locale: Locale = 'en'): AssistantReply | null {
-  const text = userText.trim();
+  const text = stripPolite(userText);
   const lower = text.toLowerCase();
 
   const packed = text.match(
@@ -450,6 +463,9 @@ export function matchCommand(userText: string, locale: Locale = 'en'): Assistant
     };
   }
 
+  const edited = editCommand(text, locale);
+  if (edited) return edited;
+
   const tweet = lower.match(/^(?:tweet|post on (?:x|twitter)|publish on (?:x|twitter))\s+(.+)/i);
   if (tweet) {
     return {
@@ -541,6 +557,56 @@ function taskReply(rest: string, locale: Locale, important: boolean): AssistantR
       priority: important ? 1 : 0,
     },
   };
+}
+
+function editPayload(rest: string): { text?: string; when?: string } {
+  const when = rest.match(
+    /^(?:tomorrow(?:\s+at\s+.+)?|ma[nñ]ana(?:\s+a las\s+.+)?|today(?:\s+at\s+.+)?|hoy(?:\s+a las\s+.+)?|tonight|esta noche|at\s+\d.+|a las\s+\d.+|on\s+\w+.*|el\s+\w+.*|in\s+\d+\s+\w+|en\s+\d+\s+\w+|\d{1,2}(?::\d{2})?\s*(?:am|pm)?)$/i,
+  );
+  if (when) return { when: rest.trim() };
+  return { text: rest.trim() };
+}
+
+function editCommand(text: string, locale: Locale): AssistantReply | null {
+  const task = text.match(
+    /^(?:change|rename|edit|move|reschedule)\s+(?:the\s+)?(.+?)\s+task\s+(?:to|for)\s+(.+)$/i,
+  ) ?? text.match(
+    /^(?:cambia|mueve|reprograma|edita)\s+(?:la\s+)?tarea\s+(?:de\s+|del\s+)?(.+?)\s+(?:a|para)\s+(.+)$/i,
+  );
+  if (task) {
+    const payload = editPayload(task[2].trim());
+    return {
+      say: say(locale, `Updated task "${task[1].trim()}".`, `Tarea "${task[1].trim()}" actualizada.`),
+      action: { tool: 'update_task', title: task[1].trim(), ...payload },
+    };
+  }
+
+  const reminder = text.match(
+    /^(?:change|move|reschedule|edit)\s+(?:the\s+)?(.+?)\s+reminder\s+(?:to|for)\s+(.+)$/i,
+  ) ?? text.match(
+    /^(?:cambia|mueve|reprograma|edita)\s+(?:el\s+)?recordatorio\s+(?:de\s+|del\s+)?(.+?)\s+(?:a|para)\s+(.+)$/i,
+  );
+  if (reminder) {
+    const payload = editPayload(reminder[2].trim());
+    return {
+      say: say(locale, `Updated the ${reminder[1].trim()} reminder.`, `Recordatorio "${reminder[1].trim()}" actualizado.`),
+      action: { tool: 'update_reminder', title: reminder[1].trim(), ...payload },
+    };
+  }
+
+  const event = text.match(
+    /^(?:move|reschedule|change|edit)\s+(?:the\s+)?(?:event\s+|appointment\s+|meeting\s+)?(.+?)\s+to\s+(.+)$/i,
+  ) ?? text.match(
+    /^(?:mueve|cambia|reprograma|edita)\s+(?:el\s+|la\s+)?(?:evento\s+|cita\s+|reuni[oó]n\s+)?(.+?)\s+((?:a las|al|para)\s+.+)$/i,
+  );
+  if (event && !/\b(task|tarea|reminder|recordatorio|note|nota)\b/i.test(event[1])) {
+    return {
+      say: say(locale, `Moved "${event[1].trim()}" to ${event[2].trim()}.`, `Movido "${event[1].trim()}" a ${event[2].trim()}.`),
+      action: { tool: 'update_event', title: event[1].trim(), when: event[2].trim() },
+    };
+  }
+
+  return null;
 }
 
 function matchBrief(lower: string): string | null {

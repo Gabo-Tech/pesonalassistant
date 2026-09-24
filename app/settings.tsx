@@ -24,9 +24,10 @@ import { openAccessibilitySettings, openTtsSettings } from '../src/share/intents
 import { useSettings, type LlmProvider } from '../src/settings/store';
 import { clearCloudKey, readCloudKey, saveCloudKey } from '../src/settings/secrets';
 import { Bento, BentoLabel, Chip, GUTTER, InkSwitch, PAGE_MARGIN } from '../src/ui/Bento';
+import { Button, TextAction } from '../src/ui/Button';
 import { KeyboardGutter } from '../src/ui/KeyboardGutter';
 import { useTheme } from '../src/ui/ThemeProvider';
-import { Body, Meta } from '../src/ui/Type';
+import { Body, Display, Meta } from '../src/ui/Type';
 import { voiceSession } from '../src/voice/session';
 import { isSttReady, loadStt, sttLoadedPath, unloadStt } from '../src/voice/stt';
 import { listTtsVoices, speak } from '../src/voice/tts';
@@ -62,6 +63,7 @@ export default function SettingsScreen() {
   const [voices, setVoices] = useState<RankedVoice[]>([]);
   const [diskRev, setDiskRev] = useState(0);
   const [bulkProgress, setBulkProgress] = useState<{ name: string; fraction: number } | null>(null);
+  const [voicesOpen, setVoicesOpen] = useState(false);
   const [keyDraft, setKeyDraft] = useState('');
   const [keyTail, setKeyTail] = useState<string | null>(null);
   const bulkCancel = useRef<(() => void) | null>(null);
@@ -223,7 +225,7 @@ export default function SettingsScreen() {
           calendarDenied ? (
             <>
               <Body style={{ color: t.dim }}>{tr('settings.calendarNeed')}</Body>
-              <InkButton label={tr('settings.calendarGrant')} onPress={() => void loadCalendars(true)} />
+              <Button label={tr('settings.calendarGrant')} onPress={() => void loadCalendars(true)} />
             </>
           ) : calendars.length === 0 ? (
             <Body style={{ color: t.dim }}>{tr('settings.calendarNone')}</Body>
@@ -259,19 +261,16 @@ export default function SettingsScreen() {
                 <Meta>{fact.title}</Meta>
                 <Body>{fact.text}</Body>
               </View>
-              <Pressable
+              <TextAction
+                label={tr('common.delete')}
+                danger
                 onPress={() => {
                   void (async () => {
                     await deleteFact(fact.id);
                     await loadFacts();
                   })();
                 }}
-                accessibilityRole="button"
-                accessibilityLabel={`${tr('common.delete')} ${fact.title}`}
-                style={{ paddingVertical: 8, paddingHorizontal: 4 }}
-              >
-                <Meta>{tr('common.delete')}</Meta>
-              </Pressable>
+              />
             </View>
           ))
         )}
@@ -306,33 +305,46 @@ export default function SettingsScreen() {
         {voices.length === 0 ? (
           <Body style={{ color: t.dim }}>{tr('voice.noVoices')}</Body>
         ) : (
-          voices.slice(0, 12).map((voice) => {
-            const active = settings.ttsVoiceId === voice.identifier;
-            return (
-              <Pressable
-                key={voice.identifier}
-                onPress={() => void updateSettings({ ttsVoiceId: voice.identifier })}
-                style={[
-                  styles.factRow,
-                  {
-                    borderColor: active ? t.ink : t.line,
-                    borderRadius: t.radiusChip,
-                    paddingVertical: 10,
-                  },
-                ]}
-              >
-                <Body style={{ flex: 1 }}>
-                  {formatVoiceLabel(voice, tr('voice.neural'))}
-                </Body>
-              </Pressable>
-            );
-          })
+          <>
+            <Body>
+              {formatVoiceLabel(
+                voices.find((voice) => voice.identifier === settings.ttsVoiceId) ?? voices[0],
+                tr('voice.neural'),
+              )}
+            </Body>
+            <Button
+              tone="secondary"
+              label={voicesOpen ? tr('settings.hideVoices') : tr('settings.chooseVoice')}
+              onPress={() => setVoicesOpen((open) => !open)}
+            />
+            {voicesOpen
+              ? voices.slice(0, 12).map((voice) => {
+                  const active = settings.ttsVoiceId === voice.identifier;
+                  return (
+                    <Pressable
+                      key={voice.identifier}
+                      onPress={() => void updateSettings({ ttsVoiceId: voice.identifier })}
+                      style={[
+                        styles.factRow,
+                        {
+                          borderColor: active ? t.ink : t.line,
+                          borderRadius: t.radiusChip,
+                          paddingVertical: 10,
+                        },
+                      ]}
+                    >
+                      <Body style={{ flex: 1 }}>{formatVoiceLabel(voice, tr('voice.neural'))}</Body>
+                    </Pressable>
+                  );
+                })
+              : null}
+          </>
         )}
-        <InkButton
+        <Button
           label={tr('voice.tryVoice')}
           onPress={() => speak(tr('voice.trySample'))}
         />
-        <GhostButton label={tr('voice.openTts')} onPress={() => void openTtsSettings()} />
+        <Button tone="secondary" label={tr('voice.openTts')} onPress={() => void openTtsSettings()} />
 
         <Meta style={{ marginTop: 8 }}>{tr('voice.rate')}</Meta>
         <View style={styles.chipRow}>
@@ -366,6 +378,8 @@ export default function SettingsScreen() {
         </View>
       </Section>
 
+      <Display style={{ fontSize: 28, width: '100%', marginTop: 8 }}>{tr('settings.advanced')}</Display>
+
       <Section title={tr('settings.models')}>
         <Body style={{ color: t.dim }}>{tr('settings.modelsHint')}</Body>
         {remaining.length > 0 ? (
@@ -380,13 +394,13 @@ export default function SettingsScreen() {
                   ]}
                 />
               </View>
-              <GhostButton
+              <Button tone="secondary"
                 label={`${tr('common.cancel')} (${Math.round(bulkProgress.fraction * 100)}%)`}
                 onPress={() => bulkCancel.current?.()}
               />
             </>
           ) : (
-            <InkButton
+            <Button
               label={`${tr('settings.downloadRemaining')} (${formatBytes(remainingBytes)})`}
               onPress={() => void downloadRemaining()}
             />
@@ -442,7 +456,7 @@ export default function SettingsScreen() {
               placeholderTextColor={t.dim}
               style={[styles.input, { color: t.ink, borderColor: t.line, borderRadius: t.radiusChip }]}
             />
-            <InkButton
+            <Button
               label={tr('settings.cloudSave')}
               onPress={() => {
                 const next = keyDraft.trim();
@@ -454,7 +468,7 @@ export default function SettingsScreen() {
               }}
             />
             {keyTail ? (
-              <GhostButton
+              <Button tone="secondary"
                 label={tr('settings.cloudClear')}
                 onPress={() => {
                   void clearCloudKey().then(() => {
@@ -473,13 +487,13 @@ export default function SettingsScreen() {
         {isCrawlerAvailable() ? (
           <>
             <Body>{crawlerOn ? tr('settings.crawlerOn') : tr('settings.crawlerOff')}</Body>
-            <InkButton
+            <Button
               label={tr('settings.accessibility')}
               onPress={() => {
                 void openAccessibilitySettings();
               }}
             />
-            <GhostButton label={tr('settings.recheck')} onPress={() => setCrawlerOn(isCrawlerEnabled())} />
+            <Button tone="secondary" label={tr('settings.recheck')} onPress={() => setCrawlerOn(isCrawlerEnabled())} />
           </>
         ) : (
           <Body>{tr('settings.crawlerMissing')}</Body>
@@ -610,7 +624,7 @@ function ModelRow({
               ]}
             />
           </View>
-          <GhostButton
+          <Button tone="secondary"
             label={`${tr('common.cancel')} (${Math.round(progress * 100)}%)`}
             onPress={() => cancelFn?.()}
           />
@@ -620,19 +634,15 @@ function ModelRow({
           <Meta style={{ color: t.ink }}>{inUse ? tr('settings.loaded') : tr('settings.downloaded')}</Meta>
           <View style={styles.chipRow}>
             {!inUse && localPath(spec) ? (
-              <Pressable onPress={() => void activate(localPath(spec)!)} hitSlop={8}>
-                <Meta style={{ color: t.ink }}>{tr('settings.use')}</Meta>
-              </Pressable>
+              <TextAction label={tr('settings.use')} onPress={() => void activate(localPath(spec)!)} />
             ) : null}
-            <Pressable onPress={() => void remove()} hitSlop={8}>
-              <Meta>{tr('common.delete')}</Meta>
-            </Pressable>
+            <TextAction label={tr('common.delete')} onPress={() => void remove()} danger />
           </View>
         </View>
       ) : (
         <>
-          <InkButton label={tr('settings.download')} onPress={() => void start()} />
-          <GhostButton label={tr('settings.import')} onPress={() => void pickFile()} />
+          <Button label={tr('settings.download')} onPress={() => void start()} />
+          <Button tone="secondary" label={tr('settings.import')} onPress={() => void pickFile()} />
         </>
       )}
 
@@ -664,41 +674,6 @@ function Toggle({
       <Body style={{ flex: 1 }}>{label}</Body>
       <InkSwitch value={value} onValueChange={onChange} />
     </View>
-  );
-}
-
-function InkButton({ label, onPress }: { label: string; onPress: () => void }) {
-  const t = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        backgroundColor: t.inverse,
-        borderRadius: t.radiusChip,
-        paddingVertical: 12,
-        alignItems: 'center',
-      }}
-    >
-      <Meta style={{ color: t.inverseInk }}>{label}</Meta>
-    </Pressable>
-  );
-}
-
-function GhostButton({ label, onPress }: { label: string; onPress: () => void }) {
-  const t = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: t.line,
-        borderRadius: t.radiusChip,
-        paddingVertical: 12,
-        alignItems: 'center',
-      }}
-    >
-      <Meta>{label}</Meta>
-    </Pressable>
   );
 }
 

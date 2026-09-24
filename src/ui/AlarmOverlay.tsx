@@ -1,9 +1,10 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useT } from '../i18n';
 import { formatClockTime } from '../llm/time';
 import { handleAlarmDismiss, handleAlarmSnooze, type RingingAlarm } from '../notify/alarmRing';
 import { useTheme } from './ThemeProvider';
+import { Button } from './Button';
 import { Body, Display, Meta } from './Type';
 
 export function AlarmOverlay({ alarm }: { alarm: RingingAlarm }) {
@@ -22,32 +23,12 @@ export function AlarmOverlay({ alarm }: { alarm: RingingAlarm }) {
       ) : null}
 
       <View style={styles.row}>
-        <Pressable
-          onPress={() => void handleAlarmDismiss()}
-          accessibilityRole="button"
-          accessibilityLabel={tr('alarm.dismiss')}
-          style={[
-            styles.button,
-            {
-              borderRadius: t.radiusChip,
-              borderWidth: StyleSheet.hairlineWidth,
-              borderColor: t.line,
-            },
-          ]}
-        >
-          <Meta>{tr('alarm.dismiss')}</Meta>
-        </Pressable>
-        <Pressable
-          onPress={() => void handleAlarmSnooze()}
-          accessibilityRole="button"
-          accessibilityLabel={tr('alarm.snooze')}
-          style={[
-            styles.button,
-            { borderRadius: t.radiusChip, backgroundColor: t.inverse },
-          ]}
-        >
-          <Meta style={{ color: t.inverseInk }}>{tr('alarm.snooze')}</Meta>
-        </Pressable>
+        <View style={{ flex: 1 }}>
+          <Button label={tr('alarm.snooze')} onPress={() => void handleAlarmSnooze()} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Button label={tr('alarm.dismiss')} onPress={() => void handleAlarmDismiss()} tone="secondary" />
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -61,5 +42,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   row: { flexDirection: 'row', gap: 12, marginTop: 36 },
-  button: { flex: 1, paddingVertical: 16, alignItems: 'center' },
 });

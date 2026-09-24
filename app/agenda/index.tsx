@@ -1,6 +1,6 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { AgendaScroll, Field, FormActions, FormError, SectionHead, agendaStyles } from '../../src/agenda/forms';
 import { draftSeed, firstParam, resolveDraftInstant } from '../../src/agenda/when';
 import { buildBrief, weekBounds } from '../../src/agenda/brief';
@@ -28,7 +28,8 @@ import { useT } from '../../src/i18n';
 import { localeTag } from '../../src/i18n/wake';
 import { formatClockTime, formatWhen, nextOccurrence, parseWhen } from '../../src/llm/time';
 import { useSettings } from '../../src/settings/store';
-import { Bento, Chip, GUTTER, InkSwitch } from '../../src/ui/Bento';
+import { Bento, Chip, GUTTER, InkSwitch, Row } from '../../src/ui/Bento';
+import { Button, TextAction } from '../../src/ui/Button';
 import { useTheme } from '../../src/ui/ThemeProvider';
 import { Body, Display, Meta } from '../../src/ui/Type';
 
@@ -310,13 +311,14 @@ export default function AgendaScreen() {
       )}
       {alarms.length === 0 && !alarmDraft && (
         <Bento span={2}>
-          <Meta>{tr('agenda.noneAlarms')}</Meta>
+          <Body style={{ color: t.dim }}>{tr('agenda.noneAlarms')}</Body>
         </Bento>
       )}
       {alarms.map((alarm) => (
-        <Bento key={alarm.id} span={2} style={agendaStyles.row}>
-          <Pressable
-            style={{ flex: 1, gap: 6 }}
+        <Bento key={alarm.id} span={2}>
+          <Row
+            title={formatClockTime(alarm.hour, alarm.minute, loc)}
+            subtitle={`${alarm.repeat === 'daily' ? tr('agenda.daily') : formatWhen(alarm.next_at, loc)}${alarm.label ? ` — ${alarm.label}` : ''}`}
             onPress={() =>
               setAlarmDraft({
                 id: alarm.id,
@@ -325,28 +327,23 @@ export default function AgendaScreen() {
                 daily: alarm.repeat === 'daily',
               })
             }
-          >
-            <Body>{formatClockTime(alarm.hour, alarm.minute, loc)}</Body>
-            <Meta>
-              {alarm.repeat === 'daily' ? tr('agenda.daily') : formatWhen(alarm.next_at, loc)}
-              {alarm.label ? ` — ${alarm.label}` : ''}
-            </Meta>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              Alert.alert(tr('common.delete'), tr('agenda.deleteAlarm'), [
-                { text: tr('common.cancel'), style: 'cancel' },
-                {
-                  text: tr('common.delete'),
-                  style: 'destructive',
-                  onPress: () => void cancelAlarm(alarm.id).then(refresh),
-                },
-              ]);
-            }}
-            hitSlop={10}
-          >
-            <Meta style={{ color: t.ink }}>{tr('common.delete')}</Meta>
-          </Pressable>
+            trailing={
+              <TextAction
+                label={tr('common.delete')}
+                danger
+                onPress={() => {
+                  Alert.alert(tr('common.delete'), tr('agenda.deleteAlarm'), [
+                    { text: tr('common.cancel'), style: 'cancel' },
+                    {
+                      text: tr('common.delete'),
+                      style: 'destructive',
+                      onPress: () => void cancelAlarm(alarm.id).then(refresh),
+                    },
+                  ]);
+                }}
+              />
+            }
+          />
         </Bento>
       ))}
 
@@ -363,24 +360,25 @@ export default function AgendaScreen() {
           />
         ))}
       </View>
-      <Pressable
-        onPress={() => {
-          setEventDraft({
-            title: '',
-            when: '',
-            seedLabel: '',
-            minutes: '60',
-            location: '',
-            allDay: false,
-            repeat: 'none',
-            alert: null,
-          });
-          setFormError(null);
-        }}
-        style={{ width: '100%' }}
-      >
-        <Meta style={{ color: t.ink }}>{tr('agenda.addEvent')}</Meta>
-      </Pressable>
+      <View style={{ width: '100%' }}>
+        <Button
+          tone="secondary"
+          label={tr('agenda.addEvent')}
+          onPress={() => {
+            setEventDraft({
+              title: '',
+              when: '',
+              seedLabel: '',
+              minutes: '60',
+              location: '',
+              allDay: false,
+              repeat: 'none',
+              alert: null,
+            });
+            setFormError(null);
+          }}
+        />
+      </View>
       {eventDraft && (
         <Bento span={2} style={{ gap: 10 }}>
           <Meta>{eventDraft.id ? tr('agenda.editEvent') : tr('agenda.addEvent')}</Meta>
@@ -394,6 +392,7 @@ export default function AgendaScreen() {
             value={eventDraft.when}
             onChange={(when) => setEventDraft({ ...eventDraft, when })}
             placeholder={tr('agenda.whenHint')}
+            hint={tr('agenda.whenHint')}
           />
           <Field
             label={tr('agenda.duration')}
@@ -455,7 +454,7 @@ export default function AgendaScreen() {
       )}
       {!calendarDenied && events.length === 0 && !eventDraft && (
         <Bento span={2}>
-          <Meta>{tr('agenda.noneEvents')}</Meta>
+          <Body style={{ color: t.dim }}>{tr('agenda.noneEvents')}</Body>
         </Bento>
       )}
       {events.map((event, index) => {
@@ -472,9 +471,10 @@ export default function AgendaScreen() {
                 })}
               </Meta>
             ) : null}
-            <Bento span={2} style={agendaStyles.row}>
-              <Pressable
-                style={{ flex: 1, gap: 6 }}
+            <Bento span={2}>
+              <Row
+                title={event.title}
+                subtitle={`${event.allDay ? tr('agenda.allDay') : formatWhen(event.start, loc)}${event.location ? ` — ${event.location}` : ''}`}
                 onPress={() => {
                   const label = formatWhen(event.start, loc);
                   setEventDraft({
@@ -491,34 +491,29 @@ export default function AgendaScreen() {
                   });
                   setFormError(null);
                 }}
-              >
-                <Body>{event.title}</Body>
-                <Meta>
-                  {event.allDay ? tr('agenda.allDay') : formatWhen(event.start, loc)}
-                  {event.location ? ` — ${event.location}` : ''}
-                </Meta>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  Alert.alert(tr('common.delete'), tr('agenda.deleteEvent'), [
-                    { text: tr('common.cancel'), style: 'cancel' },
-                    {
-                      text: tr('common.delete'),
-                      style: 'destructive',
-                      onPress: () => {
-                        const remove =
-                          settings.calendarMode === 'phone'
-                            ? deleteEvent(event.id)
-                            : deleteLocalEvent(Number(event.id));
-                        void remove.then(refresh);
-                      },
-                    },
-                  ]);
-                }}
-                hitSlop={10}
-              >
-                <Meta>{tr('common.delete')}</Meta>
-              </Pressable>
+                trailing={
+                  <TextAction
+                    label={tr('common.delete')}
+                    danger
+                    onPress={() => {
+                      Alert.alert(tr('common.delete'), tr('agenda.deleteEvent'), [
+                        { text: tr('common.cancel'), style: 'cancel' },
+                        {
+                          text: tr('common.delete'),
+                          style: 'destructive',
+                          onPress: () => {
+                            const remove =
+                              settings.calendarMode === 'phone'
+                                ? deleteEvent(event.id)
+                                : deleteLocalEvent(Number(event.id));
+                            void remove.then(refresh);
+                          },
+                        },
+                      ]);
+                    }}
+                  />
+                }
+              />
             </Bento>
           </View>
         );

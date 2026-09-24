@@ -1,6 +1,6 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { AgendaScroll, Field, FormActions, FormError, SectionHead, agendaStyles } from '../../src/agenda/forms';
 import { draftSeed, firstParam, resolveDraftInstant } from '../../src/agenda/when';
 import {
@@ -17,7 +17,8 @@ import { useT } from '../../src/i18n';
 import { localeTag } from '../../src/i18n/wake';
 import { formatWhen } from '../../src/llm/time';
 import { useSettings } from '../../src/settings/store';
-import { Bento, Chip } from '../../src/ui/Bento';
+import { Bento, Chip, Row } from '../../src/ui/Bento';
+import { TextAction } from '../../src/ui/Button';
 import { useTheme } from '../../src/ui/ThemeProvider';
 import { Body, Meta } from '../../src/ui/Type';
 
@@ -162,6 +163,7 @@ export default function RemindersScreen() {
             value={reminderDraft.when}
             onChange={(when) => setReminderDraft({ ...reminderDraft, when })}
             placeholder={tr('agenda.whenHint')}
+            hint={tr('agenda.whenHint')}
           />
           <View style={agendaStyles.chips}>
             {(['once', 'daily', 'weekly'] as const).map((repeat) => (
@@ -180,13 +182,14 @@ export default function RemindersScreen() {
       )}
       {reminders.length === 0 && !reminderDraft && (
         <Bento span={2}>
-          <Meta>{tr('agenda.noneReminders')}</Meta>
+          <Body style={{ color: t.dim }}>{tr('agenda.noneReminders')}</Body>
         </Bento>
       )}
       {reminders.map((reminder) => (
-        <Bento key={reminder.id} span={2} style={agendaStyles.row}>
-          <Pressable
-            style={{ flex: 1, gap: 6 }}
+        <Bento key={reminder.id} span={2}>
+          <Row
+            title={reminder.text}
+            subtitle={formatWhen(reminder.due_at, loc)}
             onPress={() => {
               const label = formatWhen(reminder.due_at, loc);
               setReminderDraft({
@@ -199,32 +202,29 @@ export default function RemindersScreen() {
               });
               setFormError(null);
             }}
-          >
-            <Body>{reminder.text}</Body>
-            <Meta>{formatWhen(reminder.due_at, loc)}</Meta>
-          </Pressable>
-          <Pressable
-            onPress={() => void completeReminder(reminder.id).then(refresh)}
-            hitSlop={10}
-            style={{ justifyContent: 'center' }}
-          >
-            <Meta style={{ color: t.ink }}>{tr('common.done')}</Meta>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              Alert.alert(tr('common.delete'), tr('agenda.deleteReminder'), [
-                { text: tr('common.cancel'), style: 'cancel' },
-                {
-                  text: tr('common.delete'),
-                  style: 'destructive',
-                  onPress: () => void deleteReminder(reminder.id).then(refresh),
-                },
-              ]);
-            }}
-            hitSlop={10}
-          >
-            <Meta>{tr('common.delete')}</Meta>
-          </Pressable>
+            trailing={
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <TextAction
+                  label={tr('common.done')}
+                  onPress={() => void completeReminder(reminder.id).then(refresh)}
+                />
+                <TextAction
+                  label={tr('common.delete')}
+                  danger
+                  onPress={() => {
+                    Alert.alert(tr('common.delete'), tr('agenda.deleteReminder'), [
+                      { text: tr('common.cancel'), style: 'cancel' },
+                      {
+                        text: tr('common.delete'),
+                        style: 'destructive',
+                        onPress: () => void deleteReminder(reminder.id).then(refresh),
+                      },
+                    ]);
+                  }}
+                />
+              </View>
+            }
+          />
         </Bento>
       ))}
     </AgendaScroll>

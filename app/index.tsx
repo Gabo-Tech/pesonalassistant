@@ -1,11 +1,12 @@
-import { Link } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigation, useRouter } from 'expo-router';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   StyleSheet,
+  Text,
   TextInput,
   View,
 } from 'react-native';
@@ -16,11 +17,12 @@ import { commitPending } from '../src/share/confirmGate';
 import { useGate } from '../src/share/useGate';
 import { useSettings } from '../src/settings/store';
 import { Bento, BentoLabel, GUTTER, InkSwitch, PAGE_MARGIN } from '../src/ui/Bento';
+import { Button, TextAction } from '../src/ui/Button';
 import { ConfirmCard } from '../src/ui/ConfirmCard';
 import { KeyboardGutter } from '../src/ui/KeyboardGutter';
 import { Orb } from '../src/ui/Orb';
 import { useTheme } from '../src/ui/ThemeProvider';
-import { Body, Meta } from '../src/ui/Type';
+import { Body } from '../src/ui/Type';
 import { isEnglishOnlyModel } from '../src/voice/sttLanguage';
 import { voiceSession } from '../src/voice/session';
 import { useVoice } from '../src/voice/VoiceProvider';
@@ -37,8 +39,18 @@ export default function HomeScreen() {
   const [typed, setTyped] = useState('');
   const [turns, setTurns] = useState<Turn[]>([]);
   const listRef = useRef<FlatList<Turn>>(null);
+  const navigation = useNavigation();
+  const router = useRouter();
 
   const listening = settings.alwaysListening;
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TextAction label={tr('home.clear')} onPress={() => void voiceSession.clearChat()} />
+      ),
+    });
+  }, [navigation, tr]);
 
   const refreshTurns = useCallback(async () => {
     try {
@@ -69,6 +81,7 @@ export default function HomeScreen() {
   }
 
   const status = listenStatus(snapshot.state, snapshot.error, boot.sttReady, settings.wakeWord, tr);
+  const examples = [tr('home.exampleWeek'), tr('home.exampleRemind'), tr('home.exampleNote')];
 
   const sendTyped = () => {
     const text = typed.trim();
@@ -91,21 +104,18 @@ export default function HomeScreen() {
               <Body key={line}>{line}</Body>
             ))}
             {boot.needsModels ? (
-              <Link href="/settings">
-                <Meta style={{ color: t.ink }}>{tr('home.openSettings')}</Meta>
-              </Link>
+              <Button label={tr('home.openSettings')} onPress={() => router.push('/settings')} />
             ) : null}
           </Bento>
         )}
 
         <View style={[styles.listenBar, { borderColor: t.line, backgroundColor: t.surface, borderRadius: t.radiusChip }]}>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Meta>{tr('home.alwaysListen', { wake: settings.wakeWord })}</Meta>
-            <Meta style={{ textTransform: 'none', letterSpacing: 0 }}>{status}</Meta>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Body>{tr('home.alwaysListen', { wake: settings.wakeWord })}</Body>
+            <Body style={{ color: t.dim, fontSize: 13, lineHeight: 18 }}>{status}</Body>
           </View>
           <InkSwitch value={listening} onValueChange={(on) => void toggleListening(on)} />
         </View>
-        <Meta style={{ textTransform: 'none', letterSpacing: 0 }}>{describeEngine(boot, tr)}</Meta>
 
         <FlatList
           ref={listRef}
@@ -115,7 +125,18 @@ export default function HomeScreen() {
           contentContainerStyle={styles.thread}
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
           ListEmptyComponent={
-            <Meta style={{ textAlign: 'center', marginTop: 24 }}>{tr('home.emptyChat')}</Meta>
+            <View style={{ gap: 10, marginTop: 24 }}>
+              <Body style={{ color: t.dim, textAlign: 'center' }}>{tr('home.emptyChat')}</Body>
+              {examples.map((example) => (
+                <Pressable
+                  key={example}
+                  onPress={() => void voiceSession.submitText(example)}
+                  style={[styles.example, { borderColor: t.line, borderRadius: t.radiusChip }]}
+                >
+                  <Body>{example}</Body>
+                </Pressable>
+              ))}
+            </View>
           }
           renderItem={({ item }) => <Bubble turn={item} />}
         />
@@ -135,12 +156,8 @@ export default function HomeScreen() {
         )}
 
         {(snapshot.error || boot.error) && snapshot.state !== 'off' && snapshot.error !== status ? (
-          <Meta>{snapshot.error ?? boot.error}</Meta>
+          <Body style={{ color: t.danger }}>{snapshot.error ?? boot.error}</Body>
         ) : null}
-
-        <Pressable onPress={() => void voiceSession.clearChat()} hitSlop={8} style={{ alignSelf: 'flex-start' }}>
-          <Meta>{tr('home.clear')}</Meta>
-        </Pressable>
 
         <View style={[styles.composer, { backgroundColor: t.surface, borderColor: t.line, borderRadius: t.radius }]}>
           <Orb
@@ -150,25 +167,28 @@ export default function HomeScreen() {
             compact
             showLabel={false}
           />
-          <TextInput
-            value={typed}
-            onChangeText={setTyped}
-            placeholder={tr('home.composer')}
-            placeholderTextColor={t.dim}
-            style={[styles.typedInput, { color: t.ink }]}
-            onSubmitEditing={sendTyped}
-          />
+          <View style={styles.field}>
+            {typed ? null : (
+              <Text numberOfLines={2} pointerEvents="none" style={[styles.placeholder, { color: t.dim }]}>
+                {tr('home.composer')}
+              </Text>
+            )}
+            <TextInput
+              value={typed}
+              onChangeText={setTyped}
+              placeholder=""
+              style={[styles.typedInput, !typed && StyleSheet.absoluteFill, { color: t.ink }]}
+              onSubmitEditing={sendTyped}
+            />
+          </View>
           <Pressable
             style={[styles.go, { backgroundColor: t.inverse, borderRadius: t.radiusChip }]}
             onPress={sendTyped}
+            accessibilityRole="button"
           >
-            <Meta style={{ color: t.inverseInk }}>{tr('home.go')}</Meta>
+            <Body style={{ color: t.inverseInk }}>{tr('home.go')}</Body>
           </Pressable>
         </View>
-
-        <Meta style={{ textAlign: 'center', letterSpacing: 0.8, textTransform: 'none' }}>
-          {tr('home.privacy')}
-        </Meta>
       </View>
       </KeyboardGutter>
     </KeyboardAvoidingView>
@@ -223,23 +243,6 @@ function listenStatus(
   }
 }
 
-function describeEngine(
-  boot: ReturnType<typeof useBoot>,
-  tr: ReturnType<typeof useT>,
-): string {
-  const stt = boot.sttReady ? tr('home.speechReady') : tr('home.speechNotLoaded');
-  switch (boot.engine.state) {
-    case 'ready':
-      return tr('home.modelReady', { name: boot.engine.modelName, stt });
-    case 'loading':
-      return tr('home.loadingModel', { pct: Math.round(boot.engine.progress * 100), stt });
-    case 'error':
-      return tr('home.modelFailed', { message: boot.engine.message });
-    default:
-      return tr('home.noModel', { stt });
-  }
-}
-
 const styles = StyleSheet.create({
   page: {
     flex: 1,
@@ -266,11 +269,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  typedInput: { flex: 1, fontSize: 15, paddingVertical: 8 },
+  field: { flex: 1, justifyContent: 'center' },
+  placeholder: { fontSize: 15, lineHeight: 20, paddingVertical: 8 },
+  typedInput: { fontSize: 15, paddingVertical: 8 },
   go: {
+    minHeight: 44,
     paddingHorizontal: 16,
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  example: {
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
 });

@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Button } from '../ui/Button';
 import { useT } from '../i18n';
 import { GUTTER, PAGE_MARGIN } from '../ui/Bento';
 import { KeyboardGutter } from '../ui/KeyboardGutter';
 import { useTheme } from '../ui/ThemeProvider';
-import { Display, Meta } from '../ui/Type';
+import { Body, Display, Meta } from '../ui/Type';
 
 export function AgendaScroll({ children }: { children: ReactNode }) {
   const t = useTheme();
@@ -30,13 +31,10 @@ export function SectionHead({
   action: string;
   onPress: () => void;
 }) {
-  const t = useTheme();
   return (
-    <View style={agendaStyles.sectionHead}>
+    <View style={{ width: '100%', gap: 10, marginTop: 8 }}>
       <Display style={{ fontSize: 28 }}>{title}</Display>
-      <Pressable onPress={onPress} hitSlop={8}>
-        <Meta style={{ color: t.ink }}>{action}</Meta>
-      </Pressable>
+      <Button label={action} onPress={onPress} tone="secondary" />
     </View>
   );
 }
@@ -46,11 +44,13 @@ export function Field({
   value,
   onChange,
   placeholder,
+  hint,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  hint?: string;
 }) {
   const t = useTheme();
   return (
@@ -63,37 +63,25 @@ export function Field({
         placeholderTextColor={t.dim}
         style={[agendaStyles.input, { color: t.ink, borderColor: t.line, borderRadius: t.radiusChip }]}
       />
+      {hint && value.trim() ? <Body style={{ color: t.dim, fontSize: 13, lineHeight: 18 }}>{hint}</Body> : null}
     </View>
   );
 }
 
 export function FormActions({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) {
-  const t = useTheme();
   const tr = useT();
   return (
-    <View style={agendaStyles.row}>
-      <Pressable onPress={onCancel} style={{ flex: 1, paddingVertical: 10 }}>
-        <Meta>{tr('common.cancel')}</Meta>
-      </Pressable>
-      <Pressable
-        onPress={onSave}
-        style={{
-          flex: 1,
-          backgroundColor: t.inverse,
-          borderRadius: t.radiusChip,
-          paddingVertical: 12,
-          alignItems: 'center',
-        }}
-      >
-        <Meta style={{ color: t.inverseInk }}>{tr('common.save')}</Meta>
-      </Pressable>
+    <View style={{ gap: 8 }}>
+      <Button label={tr('common.save')} onPress={onSave} />
+      <Button label={tr('common.cancel')} onPress={onCancel} tone="secondary" />
     </View>
   );
 }
 
 export function FormError({ message }: { message: string | null }) {
+  const t = useTheme();
   if (!message) return null;
-  return <Meta style={{ width: '100%' }}>{message}</Meta>;
+  return <Body style={{ width: '100%', color: t.danger }}>{message}</Body>;
 }
 
 export const agendaStyles = StyleSheet.create({

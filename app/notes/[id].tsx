@@ -23,6 +23,7 @@ import { MarkdownView } from '../../src/notes/MarkdownView';
 import { noteAccentNames, noteColorKey, type NoteAccent } from '../../src/notes/organize';
 import { inferNoteTitle } from '../../src/notes/title';
 import { Chip, GUTTER, PAGE_MARGIN } from '../../src/ui/Bento';
+import { Button } from '../../src/ui/Button';
 import { KeyboardGutter } from '../../src/ui/KeyboardGutter';
 import { noteAccents } from '../../src/ui/theme';
 import { useTheme } from '../../src/ui/ThemeProvider';
@@ -50,6 +51,18 @@ export default function NoteEditorScreen() {
   const [folderId, setFolderId] = useState<number | null>(folderFromParam(folder));
   const [pinned, setPinned] = useState(false);
   const [color, setColor] = useState<NoteAccent | ''>('');
+  const [organize, setOrganize] = useState(false);
+  const [baseline, setBaseline] = useState(() =>
+    isNew
+      ? JSON.stringify({
+          title: '',
+          body: '',
+          folderId: folderFromParam(folder),
+          pinned: false,
+          color: '',
+        })
+      : '',
+  );
 
   useEffect(() => {
     void listFolders().then(setFolders);
@@ -67,6 +80,7 @@ export default function NoteEditorScreen() {
       setFolderId(note.folder_id);
       setPinned(note.pinned === 1);
       setColor(note.color in noteAccents ? (note.color as NoteAccent) : '');
+      setBaseline(JSON.stringify({ title: note.title, body: note.body, folderId: note.folder_id, pinned: note.pinned === 1, color: note.color in noteAccents ? note.color : '' }));
       setLoaded(true);
     });
   }, [noteId, router]);
@@ -81,6 +95,21 @@ export default function NoteEditorScreen() {
     }
     router.back();
   }, [body, color, folderId, isNew, noteId, pinned, router, title]);
+
+  const dirty =
+    loaded &&
+    baseline !== JSON.stringify({ title, body, folderId, pinned, color });
+
+  const leave = useCallback(() => {
+    if (!dirty) {
+      router.back();
+      return;
+    }
+    Alert.alert(tr('notes.unsaved'), tr('notes.unsavedBody'), [
+      { text: tr('common.cancel'), style: 'cancel' },
+      { text: tr('common.back'), style: 'destructive', onPress: () => router.back() },
+    ]);
+  }, [baseline, body, color, dirty, folderId, pinned, router, title, tr]);
 
   const remove = useCallback(() => {
     if (noteId == null) {
@@ -108,15 +137,19 @@ export default function NoteEditorScreen() {
     >
       <KeyboardGutter>
         <View style={styles.bar}>
-          <Pressable onPress={() => router.back()} hitSlop={10}>
-            <Meta>{tr('common.back')}</Meta>
-          </Pressable>
-          <Pressable onPress={() => setPreview((value) => !value)} hitSlop={10}>
-            <Meta>{preview ? tr('common.write') : tr('common.preview')}</Meta>
-          </Pressable>
-          <Pressable onPress={() => void save()} hitSlop={10}>
-            <Meta style={{ color: t.ink }}>{tr('common.save')}</Meta>
-          </Pressable>
+          <View style={{ flex: 1 }}>
+            <Button label={tr('common.back')} onPress={leave} tone="secondary" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button
+              label={preview ? tr('common.write') : tr('common.preview')}
+              onPress={() => setPreview((value) => !value)}
+              tone="secondary"
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button label={tr('common.save')} onPress={() => void save()} />
+          </View>
         </View>
 
         <TextInput
@@ -127,55 +160,65 @@ export default function NoteEditorScreen() {
           style={[styles.title, { color: t.ink }]}
         />
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tools}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Chip
-            label={pinned ? tr('notes.unpin') : tr('notes.pin')}
-            active={pinned}
-            onPress={() => setPinned((value) => !value)}
+        <View style={{ paddingHorizontal: PAGE_MARGIN, paddingBottom: 8 }}>
+          <Button
+            label={tr('notes.organize')}
+            tone="secondary"
+            onPress={() => setOrganize((value) => !value)}
           />
-          <Pressable
-            onPress={() => setColor('')}
-            style={[styles.clear, { borderColor: color === '' ? t.ink : t.line }]}
-          >
-            <Meta>{tr('notes.clearColor')}</Meta>
-          </Pressable>
-          {noteAccentNames.map((name) => (
-            <Pressable
-              key={name}
-              accessibilityLabel={tr(noteColorKey(name))}
-              onPress={() => setColor(name)}
-              style={[
-                styles.swatch,
-                {
-                  backgroundColor: noteAccents[name],
-                  borderColor: color === name ? t.ink : 'transparent',
-                },
-              ]}
-            />
-          ))}
-        </ScrollView>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tools}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Chip label={tr('notes.inbox')} active={folderId == null} onPress={() => setFolderId(null)} />
-          {folders.map((item) => (
-            <Chip
-              key={item.id}
-              label={item.name}
-              active={folderId === item.id}
-              onPress={() => setFolderId(item.id)}
-            />
-          ))}
-        </ScrollView>
+        </View>
+        {organize ? (
+          <>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.tools}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Chip
+                label={pinned ? tr('notes.unpin') : tr('notes.pin')}
+                active={pinned}
+                onPress={() => setPinned((value) => !value)}
+              />
+              <Pressable
+                onPress={() => setColor('')}
+                style={[styles.clear, { borderColor: color === '' ? t.ink : t.line }]}
+              >
+                <Meta>{tr('notes.clearColor')}</Meta>
+              </Pressable>
+              {noteAccentNames.map((name) => (
+                <Pressable
+                  key={name}
+                  accessibilityLabel={tr(noteColorKey(name))}
+                  onPress={() => setColor(name)}
+                  style={[
+                    styles.swatch,
+                    {
+                      backgroundColor: noteAccents[name],
+                      borderColor: color === name ? t.ink : 'transparent',
+                    },
+                  ]}
+                />
+              ))}
+            </ScrollView>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.tools}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Chip label={tr('notes.inbox')} active={folderId == null} onPress={() => setFolderId(null)} />
+              {folders.map((item) => (
+                <Chip
+                  key={item.id}
+                  label={item.name}
+                  active={folderId === item.id}
+                  onPress={() => setFolderId(item.id)}
+                />
+              ))}
+            </ScrollView>
+          </>
+        ) : null}
 
         {preview ? (
           <ScrollView contentContainerStyle={styles.bodyPad}>
@@ -194,9 +237,9 @@ export default function NoteEditorScreen() {
         )}
 
         {!isNew ? (
-          <Pressable onPress={remove} style={styles.delete}>
-            <Meta>{tr('common.delete')}</Meta>
-          </Pressable>
+          <View style={styles.delete}>
+            <Button label={tr('common.delete')} onPress={remove} tone="danger" />
+          </View>
         ) : null}
       </KeyboardGutter>
     </KeyboardAvoidingView>
