@@ -85,33 +85,9 @@ export default function PeopleScreen() {
           <Meta style={{ color: t.ink }}>{tr('people.import')}</Meta>
         </Pressable>
         {notice ? <Body style={{ color: t.dim, width: '100%' }}>{notice}</Body> : null}
-        {draft ? (
+        {draft && draft.id == null ? (
           <Bento span={2} style={{ gap: 10 }}>
-            <Meta>{draft.id ? tr('people.edit') : tr('people.add')}</Meta>
-            <Field label={tr('people.name')} value={draft.name} onChange={(name) => setDraft({ ...draft, name })} />
-            <Field label={tr('people.phone')} value={draft.phone} onChange={(phone) => setDraft({ ...draft, phone })} />
-            <Field label={tr('people.notes')} value={draft.notes} onChange={(notes) => setDraft({ ...draft, notes })} />
-            <View style={styles.chips}>
-              {CHANNELS.map((channel) => (
-                <Chip
-                  key={channel}
-                  label={tr(`people.${channel}`)}
-                  active={draft.preferred === channel}
-                  onPress={() => setDraft({ ...draft, preferred: channel })}
-                />
-              ))}
-            </View>
-            <View style={styles.row}>
-              <Pressable onPress={() => setDraft(null)} style={{ flex: 1, paddingVertical: 10 }}>
-                <Meta>{tr('common.cancel')}</Meta>
-              </Pressable>
-              <Pressable
-                onPress={() => void save()}
-                style={{ flex: 1, backgroundColor: t.inverse, borderRadius: t.radiusChip, paddingVertical: 12, alignItems: 'center' }}
-              >
-                <Meta style={{ color: t.inverseInk }}>{tr('common.save')}</Meta>
-              </Pressable>
-            </View>
+            <ContactEditor draft={draft} onChange={setDraft} onCancel={() => setDraft(null)} onSave={() => void save()} />
           </Bento>
         ) : null}
         {people.length === 0 && !draft ? (
@@ -119,45 +95,98 @@ export default function PeopleScreen() {
             <Meta>{tr('people.none')}</Meta>
           </Bento>
         ) : null}
-        {people.map((person) => (
-          <Bento key={person.id} span={2} style={styles.row}>
-            <Pressable
-              style={{ flex: 1, gap: 6 }}
-              onPress={() =>
-                setDraft({
-                  id: person.id,
-                  name: person.name,
-                  phone: person.phone,
-                  notes: person.notes,
-                  preferred: person.preferred,
-                })
-              }
-            >
-              <Body>{person.name}</Body>
-              <Meta>
-                {tr(`people.${person.preferred}`)}
-                {person.phone ? ` · ${person.phone}` : ''}
-              </Meta>
-            </Pressable>
-            <Pressable
-              hitSlop={10}
-              onPress={() => {
-                Alert.alert(tr('common.delete'), tr('people.delete'), [
-                  { text: tr('common.cancel'), style: 'cancel' },
-                  {
-                    text: tr('common.delete'),
-                    style: 'destructive',
-                    onPress: () => void deleteContact(person.id).then(refresh),
-                  },
-                ]);
-              }}
-            >
-              <Meta>{tr('common.delete')}</Meta>
-            </Pressable>
-          </Bento>
-        ))}
+        {people.map((person) => {
+          const editing = draft?.id === person.id;
+          return (
+            <Bento key={person.id} span={2} style={editing ? { gap: 10 } : styles.row}>
+              {editing && draft ? (
+                <ContactEditor draft={draft} onChange={setDraft} onCancel={() => setDraft(null)} onSave={() => void save()} />
+              ) : (
+                <>
+                  <Pressable
+                    style={{ flex: 1, gap: 6 }}
+                    onPress={() =>
+                      setDraft({
+                        id: person.id,
+                        name: person.name,
+                        phone: person.phone,
+                        notes: person.notes,
+                        preferred: person.preferred,
+                      })
+                    }
+                  >
+                    <Body>{person.name}</Body>
+                    <Meta>
+                      {tr(`people.${person.preferred}`)}
+                      {person.phone ? ` · ${person.phone}` : ''}
+                    </Meta>
+                  </Pressable>
+                  <Pressable
+                    hitSlop={10}
+                    onPress={() => {
+                      Alert.alert(tr('common.delete'), tr('people.delete'), [
+                        { text: tr('common.cancel'), style: 'cancel' },
+                        {
+                          text: tr('common.delete'),
+                          style: 'destructive',
+                          onPress: () => void deleteContact(person.id).then(refresh),
+                        },
+                      ]);
+                    }}
+                  >
+                    <Meta>{tr('common.delete')}</Meta>
+                  </Pressable>
+                </>
+              )}
+            </Bento>
+          );
+        })}
       </ScrollView>
     </KeyboardGutter>
+  );
+}
+
+function ContactEditor({
+  draft,
+  onChange,
+  onCancel,
+  onSave,
+}: {
+  draft: Draft;
+  onChange: (draft: Draft) => void;
+  onCancel: () => void;
+  onSave: () => void;
+}) {
+  const t = useTheme();
+  const tr = useT();
+  return (
+    <>
+      <Meta>{draft.id ? tr('people.edit') : tr('people.add')}</Meta>
+      <Field label={tr('people.name')} value={draft.name} onChange={(name) => onChange({ ...draft, name })} />
+      <Field label={tr('people.phone')} value={draft.phone} onChange={(phone) => onChange({ ...draft, phone })} />
+      <Field label={tr('people.notes')} value={draft.notes} onChange={(notes) => onChange({ ...draft, notes })} />
+      <View style={styles.chips}>
+        {CHANNELS.map((channel) => (
+          <Chip
+            key={channel}
+            label={tr(`people.${channel}`)}
+            active={draft.preferred === channel}
+            onPress={() => onChange({ ...draft, preferred: channel })}
+          />
+        ))}
+      </View>
+      <View style={styles.row}>
+        <Pressable onPress={onCancel} style={{ flex: 1, paddingVertical: 10 }}>
+          <Meta>{tr('common.cancel')}</Meta>
+        </Pressable>
+        <Pressable
+          onPress={onSave}
+          style={{ flex: 1, backgroundColor: t.inverse, borderRadius: t.radiusChip, paddingVertical: 12, alignItems: 'center' }}
+        >
+          <Meta style={{ color: t.inverseInk }}>{tr('common.save')}</Meta>
+        </Pressable>
+      </View>
+    </>
   );
 }
 

@@ -14,6 +14,8 @@ export const TOOL_NAMES = [
   'search_notes',
   'append_note',
   'delete_note',
+  'file_note',
+  'mark_note',
   'create_event',
   'list_events',
   'delete_event',
@@ -49,7 +51,7 @@ export type Action = {
   title?: string;
   /** Note body, message text, tweet text, reminder text. */
   text?: string;
-  /** Search query. */
+  /** Search query. On create_note, the folder name. */
   query?: string;
   /** Row id for append_note / complete_reminder. */
   id?: number;
@@ -115,6 +117,43 @@ export const WRITE_TOOLS: ReadonlySet<ToolName> = new Set([
   'create_alarm',
   'create_contact',
 ]);
+
+/** Chat replies are prose. If the model still emits JSON, speak only the say field. */
+export function spokenChat(raw: string): string {
+  const trimmed = raw.trim();
+  const start = trimmed.indexOf('{');
+  const end = trimmed.lastIndexOf('}');
+  if (start !== -1 && end > start) {
+    try {
+      const parsed = JSON.parse(trimmed.slice(start, end + 1)) as { say?: unknown };
+      if (typeof parsed.say === 'string' && parsed.say.trim()) return parsed.say.trim();
+    } catch {
+      // Prose that happens to contain braces.
+    }
+  }
+  return trimmed;
+}
+
+/** True when the model emitted a schema-shaped reply, including tool "none". */
+export function toolReplyUsable(raw: string): boolean {
+  const text = raw.trim();
+  const jsonStart = text.indexOf('{');
+  const jsonEnd = text.lastIndexOf('}');
+  if (jsonStart === -1 || jsonEnd <= jsonStart) return false;
+
+  try {
+    const parsed = JSON.parse(text.slice(jsonStart, jsonEnd + 1)) as Partial<AssistantReply>;
+    const tool = parsed.action?.tool;
+    return (
+      typeof parsed.say === 'string' &&
+      parsed.say.trim().length > 0 &&
+      !!tool &&
+      TOOL_NAMES.includes(tool)
+    );
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Coerces whatever the model produced into our shape.

@@ -33,10 +33,12 @@ Reply with JSON only: {"say": "...", "action": {"tool": "...", ...}}
 
 Available tools and their fields:
 - none: just talk. Use for greetings, questions, chit-chat. Use this when answering from known facts.
-- create_note: title, text. Markdown is allowed in text. Title may be omitted; a heading becomes the title.
+- create_note: title, text. Markdown is allowed in text. Title may be omitted; a heading becomes the title. query is the folder name when they name one.
 - search_notes: query
 - append_note: title or id, text
 - delete_note: title or query
+- file_note: title or query is the note, text is the folder. text "inbox" takes it out of a folder. Create the folder if it is new.
+- mark_note: title or query is the note, text is pin, unpin, amber, sage, sky, rose, or clear.
 - create_event: title, when, duration_minutes
 - list_events: when (optional)
 - delete_event: title or query
@@ -95,6 +97,15 @@ User: cancel the 7am alarm
 User: note that the wifi password is hunter2
 {"say": "Saved that note.", "action": {"tool": "create_note", "title": "Wifi password", "text": "hunter2"}}
 
+User: note in Work that the wifi password is hunter2
+{"say": "Saved that note.", "action": {"tool": "create_note", "title": "Wifi password", "text": "hunter2", "query": "Work"}}
+
+User: put the wifi note in Work
+{"say": "Filed in Work.", "action": {"tool": "file_note", "title": "wifi", "text": "Work"}}
+
+User: pin the shopping note
+{"say": "Pinned.", "action": {"tool": "mark_note", "title": "shopping", "text": "pin"}}
+
 User: I'm Gabriel and I'm 29
 {"say": "I'll remember that.", "action": {"tool": "remember_fact", "title": "identity", "text": "Name Gabriel, age 29"}}
 
@@ -127,4 +138,34 @@ User: remind me to leave a review right after the dentist
 
 User: hello
 {"say": "Hi. What do you need?", "action": {"tool": "none"}}`;
+}
+
+/**
+ * Short prompt for greetings and questions. No tool list and no JSON grammar,
+ * so the first sentence can be spoken while the model is still writing.
+ */
+export function buildChatPrompt(
+  nowMs = Date.now(),
+  facts: PromptFact[] = [],
+  locale: 'en' | 'es' = 'en',
+  onDevice = true,
+): string {
+  const now = new Date(nowMs);
+  const languageLine =
+    locale === 'es'
+      ? 'Reply in Spanish. One or two short spoken sentences. No markdown and no JSON.'
+      : 'Reply in English. One or two short spoken sentences. No markdown and no JSON.';
+  const where = onDevice
+    ? "You are a private on-device assistant. You run entirely on the user's phone."
+    : "You are a private assistant. The user's calendar, tasks, and reminders stay on their phone.";
+
+  return `${where}
+
+Current date and time: ${now.toString()}
+
+${formatFactsForPrompt(facts)}
+
+${languageLine}
+Answer questions about the user only from Known facts. If a fact is not listed, say you do not know.
+Do not claim you saved a note, set a reminder, or changed the calendar.`;
 }

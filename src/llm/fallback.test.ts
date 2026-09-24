@@ -120,6 +120,32 @@ describe('fallbackAsk', () => {
     assert.match(reply.say, /Settings/);
   });
 
+  it('files, pins, and colors notes without a model', () => {
+    const filed = fallbackAsk('put the wifi note in Work');
+    assert.equal(filed.action?.tool, 'file_note');
+    assert.equal(filed.action?.title, 'wifi');
+    assert.equal(filed.action?.text, 'Work');
+
+    const pinned = fallbackAsk('pin the shopping note');
+    assert.equal(pinned.action?.tool, 'mark_note');
+    assert.equal(pinned.action?.title, 'shopping');
+    assert.equal(pinned.action?.text, 'pin');
+
+    const colored = fallbackAsk('highlight the shopping note yellow');
+    assert.equal(colored.action?.tool, 'mark_note');
+    assert.equal(colored.action?.text, 'amber');
+
+    const created = fallbackAsk('note in Work that the wifi password is hunter2');
+    assert.equal(created.action?.tool, 'create_note');
+    assert.equal(created.action?.query, 'Work');
+    assert.match(created.action?.text ?? '', /hunter2/);
+
+    const spanish = fallbackAsk('pon la nota wifi en Trabajo', 'es');
+    assert.equal(spanish.action?.tool, 'file_note');
+    assert.equal(spanish.action?.title, 'wifi');
+    assert.equal(spanish.action?.text, 'Trabajo');
+  });
+
   it('creates a Spanish note, alarm, and reminder', () => {
     const note = fallbackAsk('anota que la wifi es hunter2', 'es');
     assert.equal(note.action?.tool, 'create_note');

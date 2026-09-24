@@ -1,13 +1,18 @@
-import { initLlama, type LlamaContext } from 'llama.rn';
+import { initLlama, type LlamaContext, type TokenData } from 'llama.rn';
 import { t } from '../i18n';
 import { listFacts } from '../db/facts';
+import type { PromptFact } from '../db/factsFormat';
 import { recentTurns } from '../db/turns';
+import { localPath, MODELS } from '../models/catalog';
+import { nextHeavierModelId } from '../models/tier';
 import { peekSettings } from '../settings/store';
 import { readCloudKey } from '../settings/secrets';
 import { fallbackAsk, matchCommand } from './fallback';
+import { looksLikeTask } from './intent';
 import { cloudReplyText, cloudRequest, type CloudProvider, type CloudTurn } from './cloud';
-import { buildSystemPrompt } from './prompt';
-import { parseReply, REPLY_SCHEMA, type AssistantReply } from './tools';
+import { buildChatPrompt, buildSystemPrompt } from './prompt';
+import { parseReply, REPLY_SCHEMA, spokenChat, toolReplyUsable, type AssistantReply } from './tools';
+import { takeSentences } from '../voice/sentences';
 
 /**
  * Wraps llama.cpp (via llama.rn) as a single long-lived context.
@@ -27,6 +32,8 @@ let context: LlamaContext | null = null;
 let loadedPath: string | null = null;
 let status: EngineStatus = { state: 'unloaded' };
 let loading: Promise<void> | null = null;
+/** Reloads the resident model after a heavier task attempt, without blocking the spoken answer. */
+let restoring: Promise<void> | null = null;
 
 const listeners = new Set<(s: EngineStatus) => void>();
 
@@ -92,14 +99,26 @@ export async function unloadLlm(): Promise<void> {
   setStatus({ state: 'unloaded' });
 }
 
+export type AskHooks = {
+  /** Fired for each completed chat sentence so speech can start early. */
+  onSentence?: (sentence: string) => void;
+  /** Fired once before a heavier GGUF is loaded for a failed tool call. */
+  onSwap?: () => void;
+  /**
+   * When false, a bad tool parse is returned as-is.
+   * Search follow-ups pass false so a summary never swaps models.
+   */
+  escalate?: boolean;
+};
+
 /**
  * Sends one user utterance through the model and returns the parsed reply.
  *
- * `response_format: json_schema` is the important part: llama.cpp compiles the schema
- * into a GBNF grammar and masks every token that would break it, so the output is
- * always parseable JSON with a valid tool name.
+ * Chit-chat uses a short prompt and streams sentences. Tasks use JSON-schema
+ * grammar. If that grammar result is unusable and a heavier file is downloaded,
+ * the resident model is swapped out for one attempt, then loaded again.
  */
-export async function ask(userText: string): Promise<AssistantReply> {
+export async function ask(userText: string, hooks?: AskHooks): Promise<AssistantReply> {
   const settings = peekSettings();
   const locale = settings.locale;
   const command = matchCommand(userText, locale);
@@ -116,17 +135,122 @@ export async function ask(userText: string): Promise<AssistantReply> {
     }
   }
 
+  if (restoring) await restoring;
   if (!context) return fallbackAsk(userText, locale);
 
-  const [history, facts] = await Promise.all([recentTurns(6), listFacts()]);
+  if (!looksLikeTask(userText)) return completeChat(userText, locale, hooks?.onSentence);
 
-  const messages = [
-    { role: 'system', content: buildSystemPrompt(Date.now(), facts, locale, true) },
+  const raw = await completeTool(userText, locale);
+  if (toolReplyUsable(raw) || hooks?.escalate === false) return parseReply(raw);
+
+  const fastPath = loadedPath;
+  const heavier = fastPath ? heavierModelPath(fastPath) : null;
+  if (!heavier) return parseReply(raw);
+
+  hooks?.onSwap?.();
+  let reply: AssistantReply;
+  try {
+    await loadLlm(heavier);
+    reply = parseReply(await completeTool(userText, locale));
+  } catch {
+    reply = parseReply(raw);
+  }
+  restoreResident(fastPath);
+  return reply;
+}
+
+function restoreResident(fastPath: string | null): void {
+  if (!fastPath || loadedPath === fastPath) return;
+  restoring = loadLlm(fastPath)
+    .catch(() => {
+      // The heavier model stays loaded if the resident file cannot be restored.
+    })
+    .finally(() => {
+      restoring = null;
+    });
+}
+
+function heavierModelPath(currentPath: string): string | null {
+  const fileName = currentPath.split('/').pop();
+  const current = MODELS.find((model) => model.fileName === fileName);
+  const downloaded = MODELS.filter((model) => model.kind === 'llm' && localPath(model)).map(
+    (model) => model.id,
+  );
+  const nextId = nextHeavierModelId(current?.id ?? null, downloaded);
+  if (!nextId) return null;
+  const spec = MODELS.find((model) => model.id === nextId);
+  return spec ? localPath(spec) : null;
+}
+
+async function localMessages(
+  userText: string,
+  systemFor: (facts: PromptFact[]) => string,
+): Promise<{ role: string; content: string }[]> {
+  const [history, facts] = await Promise.all([recentTurns(6), listFacts()]);
+  return [
+    { role: 'system', content: systemFor(facts) },
     ...history
       .filter((turn) => turn.role !== 'system')
       .map((turn) => ({ role: turn.role, content: turn.text })),
     { role: 'user', content: userText },
   ];
+}
+
+async function completeChat(
+  userText: string,
+  locale: 'en' | 'es',
+  onSentence?: (sentence: string) => void,
+): Promise<AssistantReply> {
+  if (!context) return fallbackAsk(userText, locale);
+
+  const messages = await localMessages(userText, (facts) =>
+    buildChatPrompt(Date.now(), facts, locale, true),
+  );
+  let buffer = '';
+  let emitted = 0;
+
+  const emit = (full: string, flush: boolean): void => {
+    if (!onSentence) return;
+    if (full.trimStart().startsWith('{')) {
+      if (!flush) return;
+      const say = spokenChat(full);
+      const spoken = takeSentences(say);
+      for (const sentence of spoken.sentences) onSentence(sentence);
+      if (spoken.rest.trim()) onSentence(spoken.rest.trim());
+      return;
+    }
+    const { sentences, rest } = takeSentences(full);
+    for (const sentence of sentences.slice(emitted)) onSentence(sentence);
+    emitted = sentences.length;
+    if (flush && rest.trim()) onSentence(rest.trim());
+  };
+
+  const result = await context.completion(
+    {
+      messages,
+      jinja: true,
+      temperature: 0.3,
+      top_p: 0.9,
+      n_predict: 48,
+    },
+    (data: TokenData) => {
+      if (typeof data.accumulated_text === 'string') buffer = data.accumulated_text;
+      else buffer += data.token ?? '';
+      emit(buffer, false);
+    },
+  );
+
+  const raw = result.text || result.content || buffer;
+  emit(raw, true);
+  return { say: spokenChat(raw) };
+}
+
+async function completeTool(userText: string, locale: 'en' | 'es'): Promise<string> {
+  if (!context) return '';
+
+  const messages = await localMessages(userText, (facts) =>
+    buildSystemPrompt(Date.now(), facts, locale, true),
+  );
 
   const result = await context.completion({
     messages,
@@ -141,7 +265,7 @@ export async function ask(userText: string): Promise<AssistantReply> {
     n_predict: 128,
   });
 
-  return parseReply(result.text || result.content || '');
+  return result.text || result.content || '';
 }
 
 async function askCloud(

@@ -26,7 +26,7 @@ export type VadConfig = {
 
 export const DEFAULT_VAD: VadConfig = {
   threshold: 0.01,
-  hangoverMs: 700,
+  hangoverMs: 400,
   minSpeechMs: 250,
   maxUtteranceMs: 12_000,
   preRollMs: 300,

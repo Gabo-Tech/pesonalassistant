@@ -55,15 +55,18 @@ export function Chip({
   label,
   active,
   onPress,
+  onLongPress,
 }: {
   label: string;
   active: boolean;
   onPress: () => void;
+  onLongPress?: () => void;
 }) {
   const t = useTheme();
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={onLongPress}
       style={{
         paddingHorizontal: 14,
         paddingVertical: 8,

@@ -45,6 +45,15 @@ export function afterBlankSpeech(state: SessionState): SessionState {
   return state === 'off' ? 'off' : 'idle';
 }
 
+/** Text still to speak after early sentences have already been queued. */
+export function unsaidRemainder(full: string, spoken: readonly string[]): string {
+  const said = spoken.join(' ').replace(/\s+/g, ' ').trim();
+  const all = full.replace(/\s+/g, ' ').trim();
+  if (!said) return all;
+  if (all.toLowerCase().startsWith(said.toLowerCase())) return all.slice(said.length).trim();
+  return '';
+}
+
 export function shouldIgnoreAsync(
   generation: number,
   current: number,

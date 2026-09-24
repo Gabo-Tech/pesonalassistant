@@ -1,3 +1,6 @@
+import type { NoteAccent } from '../notes/organize';
+
+export type { NoteAccent };
 export type Appearance = 'dark' | 'light';
 
 export type Palette = {
@@ -45,6 +48,14 @@ export const lightPalette: Palette = {
 export const palettes: Record<Appearance, Palette> = {
   dark: darkPalette,
   light: lightPalette,
+};
+
+/** Muted marks for notes. The rest of the app stays grayscale. */
+export const noteAccents: Record<NoteAccent, string> = {
+  amber: '#C4A574',
+  sage: '#8FA888',
+  sky: '#7E9BB5',
+  rose: '#C48B8B',
 };
 
 export type OrbKind = 'off' | 'idle' | 'listening' | 'thinking' | 'speaking' | 'confirming';

@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseReply } from './tools.ts';
+import { parseReply, spokenChat, toolReplyUsable } from './tools.ts';
 
 describe('parseReply fact tools', () => {
   it('accepts remember_fact', () => {
@@ -34,6 +34,31 @@ describe('system prompt', () => {
     assert.match(src, /create_alarm/);
     assert.match(src, /list_alarms/);
     assert.match(src, /cancel_alarm/);
+  });
+
+  it('keeps the chat prompt free of the tool list', () => {
+    const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'prompt.ts'), 'utf8');
+    const chat = src.slice(src.indexOf('export function buildChatPrompt'));
+    assert.match(chat, /One or two short spoken sentences/);
+    assert.doesNotMatch(chat, /create_reminder/);
+  });
+});
+
+describe('spokenChat', () => {
+  it('pulls say out of accidental JSON', () => {
+    assert.equal(spokenChat('{"say": "Paris."}'), 'Paris.');
+    assert.equal(spokenChat('Paris.'), 'Paris.');
+  });
+});
+
+describe('toolReplyUsable', () => {
+  it('accepts a schema reply and rejects prose', () => {
+    assert.equal(
+      toolReplyUsable('{"say": "Hi.", "action": {"tool": "none"}}'),
+      true,
+    );
+    assert.equal(toolReplyUsable('Hello there'), false);
+    assert.equal(toolReplyUsable('{"say": "Hi."}'), false);
   });
 });
 

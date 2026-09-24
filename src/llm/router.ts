@@ -10,11 +10,22 @@ import {
   deleteLocalEvent,
   listOccurrences,
 } from '../db/localEvents';
-import { appendToNote, createNote, deleteNote, searchNotes } from '../db/notes';
+import {
+  appendToNote,
+  createNote,
+  deleteNote,
+  ensureFolder,
+  getNote,
+  moveNote,
+  searchNotes,
+  setNoteMark,
+  type Note,
+} from '../db/notes';
 import { completeReminder, createReminder, deleteReminder, listReminders } from '../db/reminders';
 import { completeTask, createTask, deleteTask, listTasks } from '../db/tasks';
 import { t } from '../i18n';
 import { localeTag } from '../i18n/wake';
+import { isInboxLabel, noteColorKey, parseNoteMark } from '../notes/organize';
 import { inferNoteTitle } from '../notes/title';
 import { requestConfirm } from '../share/confirmGate';
 import { armSend } from '../share/crawler';
@@ -23,7 +34,7 @@ import { peekSettings } from '../settings/store';
 import { eventQueryFromWhen, resolveAfterEvent } from './anchor';
 import { matchPeople, pickChannel, type Channel } from '../contacts/prefer';
 import { findUniqueMatch } from './match';
-import { chatAnswer, wantsAppendNote, wantsSavedNote } from './noteIntent';
+import { chatAnswer, wantsAppendNote, wantsFiledNote, wantsMarkedNote, wantsSavedNote } from './noteIntent';
 import { formatClockTime, formatWhen, parseReminderRepeat, parseRepeat, parseWhen } from './time';
 import type { Action } from './tools';
 
@@ -36,6 +47,19 @@ export type RouteResult = {
 
 const ok = (message: string): RouteResult => ({ message, awaitingConfirm: false });
 const pending = (message: string): RouteResult => ({ message, awaitingConfirm: true });
+
+async function namedNote(action: Action): Promise<Note | 'missing' | 'ambiguous'> {
+  if (action.id) {
+    const note = await getNote(action.id);
+    return note ?? 'missing';
+  }
+  const query = action.title?.trim() || action.query?.trim() || '';
+  if (!query) return 'missing';
+  const found = await searchNotes(query);
+  const match = findUniqueMatch(found, query, (note) => `${note.title} ${note.body}`);
+  if (match) return match;
+  return found.length > 1 ? 'ambiguous' : 'missing';
+}
 
 function loc(): string {
   return localeTag(peekSettings().locale);
@@ -86,6 +110,12 @@ export async function routeAction(
       const body = action.text?.trim() ?? '';
       if (!wantsSavedNote(userText)) return ok(chatAnswer(fallbackSay, body));
       const title = inferNoteTitle(body, action.title);
+      const folderRaw = action.query?.trim() ?? '';
+      if (folderRaw && !isInboxLabel(folderRaw)) {
+        const folder = await ensureFolder(folderRaw);
+        await createNote(title, body, { folderId: folder.id });
+        return ok(t('router.savedNoteIn', { title, folder: folder.name }));
+      }
       await createNote(title, body);
       return ok(t('router.savedNote', { title }));
     }
@@ -133,6 +163,36 @@ export async function routeAction(
       if (!match) return ok(t('router.noNoteMatch'));
       await deleteNote(match.id);
       return ok(t('router.noteDeleted'));
+    }
+
+    case 'file_note': {
+      if (!wantsFiledNote(userText)) return ok(chatAnswer(fallbackSay, action.text));
+      const named = await namedNote(action);
+      if (named === 'missing') return ok(t('router.whichNote'));
+      if (named === 'ambiguous') return ok(t('router.noNoteMatch'));
+      const folderRaw = action.text?.trim() ?? '';
+      if (!folderRaw) return ok(t('router.whichFolder'));
+      if (isInboxLabel(folderRaw)) {
+        await moveNote(named.id, null);
+        return ok(t('router.noteInbox', { title: named.title }));
+      }
+      const folder = await ensureFolder(folderRaw);
+      await moveNote(named.id, folder.id);
+      return ok(t('router.noteFiled', { title: named.title, folder: folder.name }));
+    }
+
+    case 'mark_note': {
+      if (!wantsMarkedNote(userText)) return ok(chatAnswer(fallbackSay, action.text));
+      const mark = parseNoteMark(action.text ?? '');
+      if (!mark) return ok(t('router.noteMarkWhat'));
+      const named = await namedNote(action);
+      if (named === 'missing') return ok(t('router.whichNote'));
+      if (named === 'ambiguous') return ok(t('router.noNoteMatch'));
+      await setNoteMark(named.id, mark);
+      if (mark.color) return ok(t('router.noteColored', { title: named.title, color: t(noteColorKey(mark.color)) }));
+      if (mark.color === '') return ok(t('router.noteCleared', { title: named.title }));
+      if (mark.pinned) return ok(t('router.notePinned', { title: named.title }));
+      return ok(t('router.noteUnpinned', { title: named.title }));
     }
 
     /* ---------------- reminders and events: confirm before writing ---------------- */

@@ -1,4 +1,4 @@
-import { ask } from '../llm/engine';
+import { ask, type AskHooks } from '../llm/engine';
 import { routeAction } from '../llm/router';
 import type { AssistantReply } from '../llm/tools';
 import { formatHits, searchFollowUp, searchWeb } from '../search/web';
@@ -13,7 +13,7 @@ import {
 import { t } from '../i18n';
 import { addTurn, clearTurns } from '../db/turns';
 import { peekSettings } from '../settings/store';
-import { speak, stopSpeaking } from './tts';
+import { speak, speakQueued, stopSpeaking } from './tts';
 import { isSttReady, transcribe } from './stt';
 import { EnergyVad } from './vad';
 import { detectWake } from './wake';
@@ -25,6 +25,7 @@ import {
   pushToTalkState,
   resumeAfterSpeech,
   shouldIgnoreAsync,
+  unsaidRemainder,
   type SessionState,
 } from './sessionLogic';
 
@@ -222,6 +223,7 @@ class VoiceSession {
         this.say(t('voice.yes'), 'listening', gen);
       }
     } catch (error) {
+      stopSpeaking();
       if (shouldIgnoreAsync(gen, this.generation, this.snapshot.state)) return;
       const raw = error instanceof Error ? error.message : String(error);
       const missing = /not loaded/i.test(raw);
@@ -249,7 +251,52 @@ class VoiceSession {
     await addTurn('user', text);
     if (shouldIgnoreAsync(gen, this.generation, this.snapshot.state)) return;
 
-    const reply = await this.replyFor(text, gen);
+    const spoken: string[] = [];
+    let drained = true;
+    let replyReady = false;
+    let finished = false;
+    let resume: SessionState | null = null;
+    let finalMessage = '';
+
+    const finishSpeech = (): void => {
+      if (finished || !replyReady || !drained) return;
+      if (shouldIgnoreAsync(gen, this.generation, this.snapshot.state)) return;
+      finished = true;
+      // Same tail as say(): keep the mic deaf briefly so the speaker is not transcribed.
+      setTimeout(() => {
+        if (shouldIgnoreAsync(gen, this.generation, this.snapshot.state)) return;
+        const next = resumeAfterSpeech({
+          sessionOff: this.snapshot.state === 'off',
+          gatePending: Boolean(getGateState().pending),
+          requested: resume,
+        });
+        this.update({ state: next, said: finalMessage });
+        if (next === 'listening') {
+          this.armConversationIdle();
+          this.armCantHear();
+        }
+      }, 250);
+    };
+
+    const reply = await this.replyFor(text, gen, {
+      onSentence: (sentence) => {
+        if (shouldIgnoreAsync(gen, this.generation, this.snapshot.state)) return;
+        if (!peekSettings().speakReplies) return;
+        spoken.push(sentence);
+        drained = false;
+        this.update({ state: 'speaking', said: spoken.join(' ') });
+        speakQueued(sentence, () => {
+          drained = true;
+          finishSpeech();
+        });
+      },
+      onSwap: () => {
+        if (shouldIgnoreAsync(gen, this.generation, this.snapshot.state)) return;
+        const line = t('voice.oneMoment');
+        this.update({ said: line });
+        if (peekSettings().speakReplies) speak(line);
+      },
+    });
     if (!reply || shouldIgnoreAsync(gen, this.generation, this.snapshot.state)) return;
 
     const routed = reply.action
@@ -260,12 +307,37 @@ class VoiceSession {
 
     await addTurn('assistant', routed.message);
     this.busy = false;
-    this.say(routed.message, afterCommandResume(routed.awaitingConfirm), gen);
+
+    if (spoken.length === 0) {
+      this.say(routed.message, afterCommandResume(routed.awaitingConfirm), gen);
+      return;
+    }
+
+    finalMessage = routed.message;
+    resume = afterCommandResume(routed.awaitingConfirm);
+    const rest = unsaidRemainder(routed.message, spoken);
+    replyReady = true;
+    if (rest && peekSettings().speakReplies) {
+      drained = false;
+      this.update({ state: 'speaking', said: routed.message });
+      speakQueued(rest, () => {
+        drained = true;
+        finishSpeech();
+      });
+      return;
+    }
+
+    this.update({ said: routed.message, state: 'speaking' });
+    finishSpeech();
   }
 
   /** One optional web lookup, then a single answer. A second search request is not fetched. */
-  private async replyFor(text: string, gen: number): Promise<AssistantReply | null> {
-    const first = await ask(text);
+  private async replyFor(
+    text: string,
+    gen: number,
+    hooks?: AskHooks,
+  ): Promise<AssistantReply | null> {
+    const first = await ask(text, hooks);
     if (shouldIgnoreAsync(gen, this.generation, this.snapshot.state)) return null;
     if (first.action?.tool !== 'web_search') return first;
 
@@ -277,7 +349,7 @@ class VoiceSession {
       this.update({ error: null });
       if (hits.length === 0) return { say: t('search.empty') };
 
-      const second = await ask(searchFollowUp(query, hits));
+      const second = await ask(searchFollowUp(query, hits), { escalate: false });
       if (shouldIgnoreAsync(gen, this.generation, this.snapshot.state)) return null;
       if (second.action?.tool === 'web_search') return { say: formatHits(hits) };
       return second;

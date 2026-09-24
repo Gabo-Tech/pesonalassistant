@@ -8,11 +8,139 @@
 import type { Locale } from '../i18n/wake';
 import type { AssistantReply } from './tools';
 
+/** Spoken color words. Canonical names match parseNoteMark in src/notes/organize.ts. */
+const COLOR_WORDS: Record<string, string> = {
+  amber: 'amber',
+  yellow: 'amber',
+  gold: 'amber',
+  amarillo: 'amber',
+  ambar: 'amber',
+  sage: 'sage',
+  green: 'sage',
+  verde: 'sage',
+  sky: 'sky',
+  blue: 'sky',
+  azul: 'sky',
+  rose: 'rose',
+  pink: 'rose',
+  red: 'rose',
+  rosa: 'rose',
+  rojo: 'rose',
+  clear: 'clear',
+};
+
+function canonicalColor(raw: string): string | null {
+  const key = raw
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  return COLOR_WORDS[key] ?? null;
+}
+
 function say(locale: Locale, english: string, spanish: string): string {
   return locale === 'es' ? spanish : english;
 }
 
 const remembered = (locale: Locale) => say(locale, 'I will remember that.', 'Lo recordaré.');
+
+function organizeNote(text: string, locale: Locale): AssistantReply | null {
+  const filedCreate = text.match(/^(?:note|save a note|make a note)\s+in\s+(.+?)\s+that\s+(.+)$/i);
+  if (filedCreate) {
+    const folder = filedCreate[1].trim();
+    const body = filedCreate[2].trim();
+    return {
+      say: say(locale, `Saved note in ${folder}.`, `Nota guardada en ${folder}.`),
+      action: { tool: 'create_note', title: body.slice(0, 80), text: body, query: folder },
+    };
+  }
+
+  const filedCreateEs = text.match(/^(?:anota|apunta|toma nota)\s+en\s+(.+?)\s+que\s+(.+)$/i);
+  if (filedCreateEs) {
+    const folder = filedCreateEs[1].trim();
+    const body = filedCreateEs[2].trim();
+    return {
+      say: say(locale, `Saved note in ${folder}.`, `Nota guardada en ${folder}.`),
+      action: { tool: 'create_note', title: body.slice(0, 80), text: body, query: folder },
+    };
+  }
+
+  const file = text.match(
+    /^(?:put|move|file)\s+(?:the\s+)?(.+?)\s+note\s+(?:in|into|to)(?:\s+the)?(?:\s+folder)?\s+(.+)$/i,
+  );
+  if (file) {
+    return {
+      say: say(locale, `Filed "${file[1].trim()}" in ${file[2].trim()}.`, `Nota "${file[1].trim()}" en ${file[2].trim()}.`),
+      action: { tool: 'file_note', title: file[1].trim(), text: file[2].trim() },
+    };
+  }
+
+  const fileEs = text.match(
+    /^(?:pon|mueve|archiva)\s+(?:la\s+)?nota\s+(?:de\s+|del\s+)?(.+?)\s+(?:en|a)(?:\s+la)?(?:\s+carpeta)?\s+(.+)$/i,
+  );
+  if (fileEs) {
+    return {
+      say: say(
+        locale,
+        `Filed "${fileEs[1].trim()}" in ${fileEs[2].trim()}.`,
+        `Nota "${fileEs[1].trim()}" en ${fileEs[2].trim()}.`,
+      ),
+      action: { tool: 'file_note', title: fileEs[1].trim(), text: fileEs[2].trim() },
+    };
+  }
+
+  const colored = text.match(
+    /^(?:highlight|mark)\s+(?:the\s+)?(.+?)\s+note\s+(amber|yellow|gold|sage|green|sky|blue|rose|pink|red|clear)$/i,
+  );
+  if (colored) {
+    const color = canonicalColor(colored[2]);
+    if (!color) return null;
+    return {
+      say: say(locale, `Marked "${colored[1].trim()}".`, `Nota "${colored[1].trim()}" marcada.`),
+      action: { tool: 'mark_note', title: colored[1].trim(), text: color },
+    };
+  }
+
+  const coloredEs = text.match(
+    /^(?:marca|destaca)\s+(?:la\s+)?nota\s+(?:de\s+|del\s+)?(.+?)\s+(?:de\s+|en\s+)?(amarillo|ambar|ámbar|verde|azul|rosa|rojo)$/i,
+  );
+  if (coloredEs) {
+    const color = canonicalColor(coloredEs[2]);
+    if (!color) return null;
+    return {
+      say: say(locale, `Marked "${coloredEs[1].trim()}".`, `Nota "${coloredEs[1].trim()}" marcada.`),
+      action: { tool: 'mark_note', title: coloredEs[1].trim(), text: color },
+    };
+  }
+
+  const pin = text.match(/^(?:unpin|pin|highlight)\s+(?:the\s+)?(.+?)\s+note$/i);
+  if (pin) {
+    const unpin = /^unpin/i.test(text);
+    return {
+      say: say(
+        locale,
+        unpin ? `Unpinned "${pin[1].trim()}".` : `Pinned "${pin[1].trim()}".`,
+        unpin ? `Nota "${pin[1].trim()}" desfijada.` : `Nota "${pin[1].trim()}" fijada.`,
+      ),
+      action: { tool: 'mark_note', title: pin[1].trim(), text: unpin ? 'unpin' : 'pin' },
+    };
+  }
+
+  const pinEs = text.match(/^(?:desfija|fija|destaca)\s+(?:la\s+)?nota\s+(?:de\s+|del\s+)?(.+)$/i);
+  if (pinEs) {
+    const unpin = /^desfija/i.test(text);
+    return {
+      say: say(
+        locale,
+        unpin ? `Unpinned "${pinEs[1].trim()}".` : `Pinned "${pinEs[1].trim()}".`,
+        unpin ? `Nota "${pinEs[1].trim()}" desfijada.` : `Nota "${pinEs[1].trim()}" fijada.`,
+      ),
+      action: { tool: 'mark_note', title: pinEs[1].trim(), text: unpin ? 'unpin' : 'pin' },
+    };
+  }
+
+  return null;
+}
 
 export function matchCommand(userText: string, locale: Locale = 'en'): AssistantReply | null {
   const text = userText.trim();
@@ -101,6 +229,9 @@ export function matchCommand(userText: string, locale: Locale = 'en'): Assistant
       action: { tool: 'forget_fact', title: olvida[1].trim() },
     };
   }
+
+  const organized = organizeNote(text, locale);
+  if (organized) return organized;
 
   const note = lower.match(/^(?:note that|make a note|remember that)\s+(.+)/i);
   if (note) {

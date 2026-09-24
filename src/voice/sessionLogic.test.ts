@@ -6,6 +6,7 @@ import {
   pushToTalkState,
   resumeAfterSpeech,
   shouldIgnoreAsync,
+  unsaidRemainder,
 } from './sessionLogic.ts';
 
 describe('resumeAfterSpeech', () => {
@@ -50,6 +51,17 @@ describe('afterBlankSpeech', () => {
     assert.equal(afterBlankSpeech('listening'), 'listening');
     assert.equal(afterBlankSpeech('idle'), 'idle');
     assert.equal(afterBlankSpeech('confirming'), 'confirming');
+  });
+});
+
+describe('unsaidRemainder', () => {
+  it('speaks only the part that was not already queued', () => {
+    assert.equal(unsaidRemainder('Hi. What do you need?', ['Hi.']), 'What do you need?');
+    assert.equal(unsaidRemainder('Hi. What do you need?', ['Hi.', 'What do you need?']), '');
+  });
+
+  it('does not repeat when the spoken text diverges', () => {
+    assert.equal(unsaidRemainder('All set.', ['Something else.']), '');
   });
 });
 

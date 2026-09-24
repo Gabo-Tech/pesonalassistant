@@ -147,6 +147,12 @@ export async function updateLocalEvent(
   }
 }
 
+export async function getLocalEvent(id: number): Promise<LocalEvent | null> {
+  if (!Number.isFinite(id)) return null;
+  const db = await getDb();
+  return db.getFirstAsync<LocalEvent>('SELECT * FROM local_events WHERE id = ?', id);
+}
+
 export async function deleteLocalEvent(id: number): Promise<void> {
   const db = await getDb();
   const current = await db.getFirstAsync<LocalEvent>('SELECT * FROM local_events WHERE id = ?', id);
